@@ -550,7 +550,7 @@
 )
 
 (map-set rewards-calcs .rewards-calc true)
-(map-set swaps .swap-router true)
+(map-set swaps .swap-router-dummy true)
 (map-set swaps .swap-router-xbtc-xusd true)
 (map-set cps .cp-token true)
 (map-set lps .lp-token true)
