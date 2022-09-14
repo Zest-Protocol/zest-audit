@@ -20,7 +20,7 @@
 (define-public (set-contract-owner (owner principal))
   (begin
     (asserts! (is-eq tx-sender (var-get contract-owner)) ERR_UNAUTHORIZED)
-    (print { type: "set-contract-owner-liquidity-vault-v1-0", payload: owner })
+    (print { type: "set-contract-owner-cover-vault", payload: owner })
     (ok (var-set contract-owner owner))
   )
 )
@@ -36,7 +36,6 @@
 (define-public (transfer (amount uint) (recipient principal) (ft <ft>))
   (begin
     (try! (is-approved-contract contract-caller))
-    (print { type: "transfer-liquidity-vault-v1-0", payload: { amount: amount, recipient: recipient, asset: ft } })
     (as-contract (contract-call? ft transfer amount tx-sender recipient none))
   )
 )
@@ -48,7 +47,9 @@
     (try! (is-approved-contract contract-caller))
     (try! (contract-call? asset transfer amount sender (as-contract tx-sender) none))
     (map-set assets token-id (+ asset-amount amount))
-    (print { type: "add-asset-liquidity-vault-v1-0", payload: { amount: amount, sender: sender, asset: asset, token-id: token-id } })
+
+    (print { type: "add-asset-cover-vault", payload: { amount: (+ asset-amount amount), token-id: token-id, sender: sender } })
+
     (ok (+ asset-amount amount))
   )
 )
@@ -63,12 +64,12 @@
     (if (>= amount asset-amount)
       (begin
         (map-set assets token-id u0)
-        (print { type: "remove-asset-liquidity-vault-v1-0", payload: { amount: u0, recipient: recipient, asset: asset, token-id: token-id } })
+        (print { type: "remove-asset-cover-vault", payload: { amount: u0, token-id: token-id, recipient: recipient } })
         (ok u0)
       )
       (begin
         (map-set assets token-id (- asset-amount amount))
-        (print { type: "remove-asset-liquidity-vault-v1-0", payload: { amount: (- asset-amount amount), recipient: recipient, asset: asset, token-id: token-id } })
+        (print { type: "remove-asset-cover-vault", payload: { amount: (- asset-amount amount), token-id: token-id, recipient: recipient } })
         (ok (- asset-amount amount))
       )
     )
@@ -82,7 +83,8 @@
     (try! (is-approved-contract contract-caller))
     (try! (as-contract (contract-call? asset transfer asset-amount tx-sender recipient none)))
     (map-delete assets token-id)
-    (print { type: "draw-liquidity-vault-v1-0", payload: { amount: u0, recipient: recipient, asset: asset, token-id: token-id } })
+    
+    (print { type: "draw-cover-vault", payload: { amount: asset-amount, token-id: token-id, recipient: recipient } })
     (ok asset-amount)
   )
 )

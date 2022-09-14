@@ -660,9 +660,7 @@
 ;; helpers
 
 (define-private (transfer (amount uint) (sender principal) (recipient principal))
-  (match
-    (contract-call? .Wrapped-Bitcoin transfer amount sender recipient none)
-    ;; (contract-call? 'ST19F1KWRKRF2BZMPW7MWV463K11WED2M39X1HR3A.Wrapped-Bitcoin transfer amount sender recipient none)
+  (match (contract-call? 'ST19F1KWRKRF2BZMPW7MWV463K11WED2M39X1HR3A.Wrapped-Bitcoin transfer amount sender recipient none)
     success (ok success)
     error (begin
       (print { transfer-error: error })
