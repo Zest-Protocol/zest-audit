@@ -1,7 +1,7 @@
 
 import { Sha256 } from "https://deno.land/std@0.67.0/hash/sha256.ts";
 import { createHash } from "https://deno.land/std@0.67.0/hash/mod.ts";
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 
 export const CSV_DELAY = 500;
 export const CSV_DELAY_HEX = encode(numberToHex(CSV_DELAY));
@@ -33,7 +33,16 @@ function getTxId(rawTx: string) {
   return toLittleEndian(txId);
 }
 
-function toLittleEndian(hex: string) {
+export function generateRandomHexString(numBytes: number) {
+  const letters = "0123456789ABCDEF";
+  let result = "";
+  for (let i = 0; i < numBytes * 2; i++)
+    result += letters[(Math.floor(Math.random() * 16))];
+
+  return result;
+}
+
+export function toLittleEndian(hex: string) {
   let s = "";
   for(let i = 0; i < hex.length; i++) {
     if(i % 2 == 0) {
@@ -43,13 +52,13 @@ function toLittleEndian(hex: string) {
   return s;
 }
 
-function numberToHex(num: number) {
+export function numberToHex(num: number) {
   let s = Number(num).toString(16);
   s = s.length % 2 ? "0".concat(s) : s;
   return s;
 }
 
-function padTo(hex: string, length = 4) {
+export function padTo(hex: string, length = 4) {
   return hex.padStart(length * 2, "0");
 }
 
@@ -69,9 +78,9 @@ function generateP2SHTx(
   swapper: number,  // in hex LE
   outputValue: number
 ) {
-  let valueHex = padTo(numberToHex(outputValue), 8);
+  const valueHex = padTo(numberToHex(outputValue), 8);
 
-  let s = `0200000001f01c1021c9d15a6ddda9e7f016586c5e1e57e8b456a90a5f741238a3ea5f01b1010000006a47\
+  const s = `0200000001f01c1021c9d15a6ddda9e7f016586c5e1e57e8b456a90a5f741238a3ea5f01b1010000006a47\
 304402206f2e00a06d84a629d1583d3e37d046dc768346e9cfb9f29a54fca8e25401661a022055bfb842f1baaad40da4ff\
 1e53431c30e383007ac53b9a93c938423c3d217b950121031aa68bfad0576216e20a30892af32e49948fbd2892c339c373\
 bc28e49e04f9bffdffffff02${toLittleEndian(valueHex)}17${generateP2SHScript(sender, recipient, expiration, hash, swapper)}c0da0\
@@ -131,7 +140,7 @@ function generateP2SHScript(
     return `${OP_HASH160}${addVarInt(generateScriptHash(htlc))}${OP_EQUAL}`;
 }
 
-function generateP2PKHScript(
+export function generateP2PKHScript(
   hash: string,
 ) {
   return `${OP_DUP}${OP_HASH160}${addVarInt(hash)}${OP_EQUALVERIFY}${OP_CHECKSIG}`;

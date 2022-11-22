@@ -1,0 +1,105 @@
+---
+id: 0
+name: Testnet deployment
+network: testnet
+stacks-node: "http://stacks-node-api.testnet.stacks.co"
+bitcoin-node: "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - contract-call:
+            contract-id: ST2KMXN966QH41G6CK760VKXNPJDMH6STYQB7WV1C.globals
+            expected-sender: ST2KMXN966QH41G6CK760VKXNPJDMH6STYQB7WV1C
+            method: onboard-user-address
+            parameters:
+              - "'ST3RY185H0R8TNX4PGRYFZ07AV001N23N1DK90F88"
+              - 0x05
+              - 0x0000000000000000000000000000000000000001
+            cost: 5960
+        - contract-call:
+            contract-id: ST2KMXN966QH41G6CK760VKXNPJDMH6STYQB7WV1C.globals
+            expected-sender: 
+            method: add-admin
+            parameters:
+              - "'ST37WFHKCE8MCZX8YH1FVPKWZ56N19CY2ZK0QJKJN"
+            cost: 5960
+        - contract-call:
+            contract-id: ST2KMXN966QH41G6CK760VKXNPJDMH6STYQB7WV1C.Wrapped-Bitcoin
+            expected-sender: ST2KMXN966QH41G6CK760VKXNPJDMH6STYQB7WV1C
+            method: transfer
+            parameters:
+              - u100000000000
+              - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+              - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.supplier-interface"
+              - (some 0x00)
+            cost: 5960
+    #     - contract-call:
+    #         contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.globals
+    #         expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+    #         method: onboard-user-address
+    #         parameters:
+    #           - "'ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP"
+    #           - 0x00
+    #           - 0x0000000000000000000000000000000000000000
+    #         cost: 5960
+    #     - contract-call:
+    #         contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.globals
+    #         expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+    #         method: onboard-user-address
+    #         parameters:
+    #           - "'ST31ZZ4171KDEGZ7RDMDG8W76XTS07W9MVRASC0KH"
+    #           - 0x00
+    #           - 0x0000000000000000000000000000000000000002
+    #         cost: 5960
+    #     - contract-call:
+    #         contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.globals
+    #         expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+    #         method: onboard-user-address
+    #         parameters:
+    #           - "'ST3EWEA30DJVG33V8FZ1S1CNB96Z1W818K7FA8D4A"
+    #           - 0x00
+    #           - 0x0000000000000000000000000000000000000003
+    #         cost: 5960
+    # - id: 4
+    #   transactions:
+    #     - contract-call:
+    #         contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.pool-v1-0
+    #         expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+    #         method: create-pool
+    #         parameters:
+    #           - "'ST3PF13W7Z0RRM42A8VZRVFQ75SV1K26RXEP8YGKJ"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.lp-token"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.zest-reward-dist"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.payment-fixed"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.rewards-calc"
+    #           - u1000
+    #           - u1000
+    #           - u100000000000
+    #           - u100000000000
+    #           - u1
+    #           - u157680
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cp-token"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cover-vault"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cp-rewards-token"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.Wrapped-Bitcoin"
+    #           - true
+    #         cost: 5960
+    #     - btc-transfer:
+    #         expected-sender: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
+    #         recipient: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC
+    #         sats-amount: 100000000
+    #         sats-per-byte: 10
+    # - id: 5
+    #   transactions:
+    #     - contract-call:
+    #         contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.Wrapped-Bitcoin
+    #         expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+    #         method: transfer
+    #         parameters:
+    #           - u100000000000
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+    #           - "'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.supplier-interface"
+    #           - none
+    #         cost: 5960

@@ -1,12 +1,12 @@
 // deno-lint-ignore-file
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { assertEquals, assert } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
+import { assertEquals, assert } from 'https://deno.land/std@0.159.0/testing/asserts.ts';
 import { Pool } from '../../interfaces/pool-v1-0.ts';
 import { CoverPool } from '../../interfaces/cover-pool-v1-0.ts';
 import { Loan } from '../../interfaces/loan-v1-0.ts';
 import { LPToken } from '../../interfaces/lp-token.ts';
 import { CPToken } from '../../interfaces/cp-token.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 import { TestUtils } from '../../interfaces/test-utils.ts';
 import { Bridge } from '../../interfaces/bridge_real.ts';
 import { Globals } from '../../interfaces/globals.ts';
@@ -72,6 +72,9 @@ Clarinet.test({
     let assetMaps = chain.getAssetsMaps();
     let pool = new Pool(chain, deployerWallet);
     let loan = new Loan(chain, deployerWallet);
+
+    // let block = runBootstrap(chain, deployerWallet);
+    // bootstrapApprovedContracts(chain, deployerWallet);
 
     pool.createPool(wallet_7.address,LP_TOKEN,ZP_TOKEN,PAYMENT,REWARDS_CALC,1000,1000,10_000_000_000,10_000_000_000,1,MAX_MATURITY_LENGTH,LIQUIDITY_VAULT,CP_TOKEN,COVER_VAULT,CP_REWARDS_TOKEN,XBTC,true);
     pool.finalizePool(wallet_7.address, LP_TOKEN, ZP_TOKEN, CP_TOKEN, 0);
@@ -163,9 +166,11 @@ Clarinet.test({
 
     assetMaps = chain.getAssetsMaps();
     
-    assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"], 9999700000);
+    assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"], 9999700000);
 
     chain.mineEmptyBlock(10);
+
+    // block = chain.mineBlock([...finalizeOutboundTxs(HASH, 99000000, 0, 58010, wallet_8.address, deployerWallet.address)]);
 
     let globals = Globals.getGlobals(chain, deployerWallet.address).expectTuple();
     let poolParams = pool.getPool(0);
@@ -177,10 +182,10 @@ Clarinet.test({
     
     block.receipts[1].result.expectOk();
     assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.protocol-treasury"], treasuryFee);
+    // assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"], lpPortion);
+    // assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${wallet_7.address}`], delegateFee);
   },
 });
-
-
 
 Clarinet.test({
   name: "Pool Delegate can unwind a funded loan",
@@ -215,7 +220,7 @@ Clarinet.test({
 
     chain.mineEmptyBlock(consumeUint(Globals.getGlobals(chain, deployerWallet.address).expectTuple()["funding-period"]) + 1);
 
-    block = pool.unwind(0,LP_TOKEN,0,FUNDING_VAULT,XBTC,wallet_7.address);
+    block = pool.unwind(0,LP_TOKEN,0,FUNDING_VAULT,LIQUIDITY_VAULT,XBTC,wallet_7.address);
     
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.funding-vault"], 0);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"], 100_000_000);
@@ -252,14 +257,14 @@ Clarinet.test({
     const LOAN_AMOUNT = 100_000_000;
 
     block = pool.createLoan(LP_TOKEN,0,LOAN_AMOUNT,XBTC,0,XBTC,300,12960,1440,COLL_VAULT,FUNDING_VAULT,wallet_8.address);
-    pool.fundLoan(0,LP_TOKEN,0,LIQUIDITY_VAULT,FUNDING_VAULT,XBTC,wallet_7.address);
+    block = pool.fundLoan(0,LP_TOKEN,0,LIQUIDITY_VAULT,FUNDING_VAULT,XBTC,wallet_7.address);
     chain.mineBlock([SupplierInterface.updateLiquidity(chain.blockHeight, 100_000_000, deployerWallet.address)]);
 
     chain.mineEmptyBlock(consumeUint(Globals.getGlobals(chain, deployerWallet.address).expectTuple()["funding-period"]) + 1);
 
-    block = pool.unwind(0,LP_TOKEN,0,LIQUIDITY_VAULT,XBTC,wallet_7.address);
+    block = pool.unwind(0,LP_TOKEN,0,FUNDING_VAULT,LIQUIDITY_VAULT,XBTC,wallet_7.address);
     
-    block = chain.mineBlock([SupplierInterface.drawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, LIQUIDITY_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)]);
+    block = chain.mineBlock([SupplierInterface.drawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)]);
     // ERR_FUNDING_EXPIRED
     block.receipts[0].result.expectErr().expectUint(ERRORS.ERR_FUNDING_EXPIRED);
   },
@@ -296,11 +301,11 @@ Clarinet.test({
     pool.fundLoan(0,LP_TOKEN,0,LIQUIDITY_VAULT,FUNDING_VAULT,XBTC,wallet_7.address);
     chain.mineBlock([SupplierInterface.updateLiquidity(chain.blockHeight, 100_000_000, deployerWallet.address)]);
 
-    block = chain.mineBlock([SupplierInterface.drawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, LIQUIDITY_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)]);
+    block = chain.mineBlock([SupplierInterface.drawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)]);
 
     chain.mineEmptyBlock(250);
 
-    block = chain.mineBlock([SupplierInterface.cancelDrawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC,0, deployerWallet.address)]);
+    block = chain.mineBlock([SupplierInterface.cancelDrawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC,0, deployerWallet.address)])
     let loanResult = loan.getLoanData(0).result.expectTuple();
     let poolResult = (pool.getPool(0));
 
@@ -360,6 +365,7 @@ Clarinet.test({
 
     assertEquals(loanBeforeDrawdown, loanAfterDrawdown);
 
+    // console.log(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]);
     block = chain.mineBlock([SupplierInterface.drawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)]);
     assertEquals(block.receipts[0].result.expectOk().expectTuple()["sats"], "u99700000");
 
@@ -411,6 +417,7 @@ Clarinet.test({
     
     block = pool.createLoan(LP_TOKEN,0,LOAN_AMOUNT,XBTC,LOAN_RATIO,XUSD_CONTRACT_SIMNET,300,5760,1440,COLL_VAULT,FUNDING_VAULT,wallet_8.address);
     
+    // console.log(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]);
     block = pool.fundLoan(0,LP_TOKEN,0,LIQUIDITY_VAULT,FUNDING_VAULT,XBTC,wallet_7.address);
     block = chain.mineBlock([SupplierInterface.updateLiquidity(chain.blockHeight, LOAN_AMOUNT, deployerWallet.address)]);
 
@@ -468,18 +475,19 @@ Clarinet.test({
     
     block = pool.createLoan(LP_TOKEN,0,LOAN_AMOUNT,XBTC,LOAN_RATIO,XUSD_CONTRACT_SIMNET,300,5760,1440,COLL_VAULT,FUNDING_VAULT,wallet_8.address);
     
+    // console.log(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]);
     block = pool.fundLoan(0,LP_TOKEN,0,LIQUIDITY_VAULT,FUNDING_VAULT,XBTC,wallet_7.address);
     block = chain.mineBlock([SupplierInterface.updateLiquidity(chain.blockHeight, LOAN_AMOUNT, deployerWallet.address)]);
 
     block = chain.mineBlock([
       SupplierInterface.drawdown(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)
     ]);
-    let collAmount = Math.floor(consumeUint(SwapRouter.getXgivenY(XUSD_CONTRACT_SIMNET, XBTC, LOAN_AMOUNT, chain, deployerWallet.address).result.expectOk() as string) * LOAN_RATIO / 10_000);
-    assertEquals(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"][`${deployerWallet.address}.coll-vault`], collAmount);
 
     chain.mineEmptyBlock(250);
 
     block = chain.mineBlock([SupplierInterface.cancelDrawdown(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, XBTC,0, deployerWallet.address)]);
-    assertEquals(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"][`${deployerWallet.address}.coll-vault`], 0);
+
+    // let collAmount = Math.floor(consumeUint(SwapRouter.getXgivenY(XUSD_CONTRACT_SIMNET, XBTC, LOAN_AMOUNT, chain, deployerWallet.address).result.expectOk() as string) * LOAN_RATIO / 10_000);
+    // assertEquals(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"][`${deployerWallet.address}.coll-vault`], collAmount);
   },
 });

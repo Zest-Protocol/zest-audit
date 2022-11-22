@@ -1,11 +1,11 @@
 // deno-lint-ignore-file
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { assertEquals, assert } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
+import { assertEquals, assert } from 'https://deno.land/std@0.159.0/testing/asserts.ts';
 import { Pool } from '../../interfaces/pool-v1-0.ts';
 import { CoverPool } from '../../interfaces/cover-pool-v1-0.ts';
 import { Loan } from '../../interfaces/loan-v1-0.ts';
 import { LPToken } from '../../interfaces/lp-token.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 import { TestUtils } from '../../interfaces/test-utils.ts';
 import { Bridge } from '../../interfaces/bridge_real.ts';
 import { Globals } from '../../interfaces/globals.ts';

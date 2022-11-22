@@ -27,9 +27,9 @@ export const COVER_VAULT = `${DEPLOYER}.cover-vault`;
 
 // export const ONE_DAY = 36;
 export const ONE_DAY = 144;
+export const DAYS_PER_YEAR = 365;
+export const DAYS_PER_WEEK = 7;
 export const CYCLE_LENGTH = ONE_DAY * 2 * 7;
-export const PASSIVE_BPS = 100;
-export const PASSIVE_DIVIDER = 10_000;
 
 export const ERRORS = {
   ERR_FUNDS_LOCKED: 8015,

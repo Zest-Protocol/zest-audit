@@ -195,15 +195,15 @@
 
     (try! (contract-call? .cover-pool-data set-sent-funds sender token-id new-funds-sent))
 
-
     (try! (contract-call? cover-vault add-asset cover-token amount token-id sender))
-    ;; (try! (contract-call? cover-token transfer amount sender (as-contract tx-sender) none))
+    
     (try! (contract-call? cp-token mint token-id amount sender))
     (try! (contract-call? cp-rewards-token mint token-id amount sender))
 
     (try! (contract-call? .read-data add-cover-pool-balance token-id amount))
 
     ;; consider when adding more funds
+    (print { type: "send-funds-cover-pool", payload: { key: { owner: sender, token-id: token-id }, new-funds-sent: new-funds-sent, amount-sent: amount } })
     (try! (contract-call? cp-token set-share-cycles current-cycle (+ (get cycles new-funds-sent) current-cycle) token-id amount sender))
 
     (ok new-funds-sent)
@@ -243,8 +243,6 @@
             (factor-sum (+ (* new-weight factor) (* prev-weight commitment-left)))
             (new-factor (if (> (/ factor-sum u10000) u1) (+ u1 (/ factor-sum u10000)) (/ factor-sum u10000)))
           )
-            ;; (print { new-commitment-cycles: factor })
-            (print { prev-factor: prev-factor, new-factor: new-factor, cycle-at-commitment-time: cycle-at-commitment-time })
             (ok { start: block-height, cycles: new-factor, withdrawal-signaled: u0, amount: u0 })
           )
           (ok { start: block-height, cycles: factor, withdrawal-signaled: u0, amount: u0 })
@@ -402,7 +400,7 @@
   )
 )
 
-(define-public (withdraw (cp-token <cp-token>) (cp-rewards-token <dt>) (cover-token <ft>) (token-id uint) (amount uint))
+(define-public (withdraw (cp-token <cp-token>) (cp-rewards-token <dt>) (cover-token <ft>) (token-id uint) (amount uint) (cover-vault <lv>))
   (let (
     (recipient contract-caller)
     (pool (try! (get-pool token-id)))
@@ -421,26 +419,28 @@
     (asserts! (> block-height unlock-time) ERR_FUNDS_LOCKED)
 
     (asserts! (is-eq (get cover-token pool) (contract-of cover-token)) ERR_INVALID_COLL)
+    (asserts! (>= (get amount sent-funds-data) amount) ERR_EXCEEDED_SIGNALED_AMOUNT)
 
     (try! (contract-call? .read-data remove-cover-pool-balance token-id amount))
 
+    (try! (contract-call? cover-vault remove-asset cover-token amount token-id recipient))
+    (try! (contract-call? .cover-pool-data set-sent-funds recipient token-id (merge sent-funds-data { withdrawal-signaled: u0, amount: u0 })))
 
-    (try! (as-contract (contract-call? cover-token transfer (- amount lost-funds) recipient recipient none)))
     (try! (contract-call? cp-token burn token-id amount recipient))
     (try! (contract-call? cp-rewards-token burn token-id amount recipient))
+
+    (print { type: "withdraw-cover-pool", payload: { key: { caller: recipient, token-id: token-id } , funds-withdrawn: amount } })
     (ok true)
   )
 )
 
 (define-public (withdraw-zest-rewards (cp-token <cp-token>) (token-id uint) (rewards-calc <rewards-calc>))
   (let (
-    ;; (withdrawn-funds (try! (contract-call? cp-token withdraw-rewards token-id)))
     (caller contract-caller)
     (rewards (try! (contract-call? cp-token withdraw-cycle-rewards token-id caller)))
     (sent-funds-data (try! (get-sent-funds caller token-id)))
     (is-rewards-calc (asserts! (contract-call? .globals is-rewards-calc (contract-of rewards-calc)) ERR_INVALID_REWARDS_CALC))
     (is-cp (asserts! (contract-call? .globals is-cp (contract-of cp-token)) ERR_INVALID_ZP))
-    ;; (rewards (try! (contract-call? rewards-calc mint-rewards tx-sender (get cycles sent-funds-data) withdrawn-funds)))
     (zest-cycle-rewards (if (> (get cycle-rewards rewards) u0) (try! (contract-call? rewards-calc mint-rewards caller (get cycles sent-funds-data) (get cycle-rewards rewards))) u0))
     (zest-base-rewards (if (> (get passive-rewards rewards) u0) (try! (contract-call? rewards-calc mint-rewards-base caller (get passive-rewards rewards))) u0))
   )
@@ -516,8 +516,6 @@
     (asserts! (is-eq (contract-of cover-token) (get cover-token pool)) ERR_INVALID_CP)
     (asserts! (is-eq (contract-of cover-vault) (get cover-vault pool)) ERR_INVALID_COVER_VAULT)
 
-
-    ;; (try! (contract-call? cover-vault transfer amount-to-send recipient cover-token))
     (try! (contract-call? cover-vault remove-asset cover-token amount-to-send token-id recipient))
     (try! (contract-call? cp-token distribute-losses token-id amount-to-send))
 
@@ -644,4 +642,5 @@
 (define-constant ERR_INVALID_STATUS (err u6020))
 (define-constant ERR_INVALID_COVER_TOKEN (err u6021))
 (define-constant ERR_INVALID_COVER_VAULT (err u6022))
+(define-constant ERR_EXCEEDED_SIGNALED_AMOUNT (err u6023))
 

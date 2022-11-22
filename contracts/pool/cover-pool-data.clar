@@ -38,7 +38,7 @@
   { start: uint, cycles: uint, withdrawal-signaled: uint, amount: uint })
 
 
-(define-map stakers { cover-provider: principal, token-id: uint } bool)
+(define-map cover-providers { cover-provider: principal, token-id: uint } bool)
 
 (define-public (create-pool
   (token-id uint)
@@ -61,7 +61,7 @@
     (try! (is-pool-contract))
     (asserts! (map-insert cover-pool token-id data) ERR_POOL_EXISTS)
     
-    (print { type: "create-pool", payload: (merge data { token-id: token-id }) })
+    (print { type: "create-cover-pool", payload: { key: token-id, data: data } })
     (ok true)
   )
 )
@@ -87,7 +87,7 @@
     (try! (is-pool-contract))
     (map-set cover-pool token-id data)
 
-    (print { type: "set-pool", payload: (merge data { token-id: token-id }) })
+    (print { type: "set-cover-pool", payload: { key: token-id, data: data } })
     (ok true)
   )
 )
@@ -101,7 +101,7 @@
     (try! (is-pool-contract))
     (map-set sent-funds { owner: owner, token-id: token-id } data)
 
-    (print { type: "set-sent-funds", payload: (merge data { token-id: token-id, owner: owner }) })
+    (print { type: "set-sent-funds", payload: { key: { token-id: token-id, owner: owner }, data: data } })
     (ok true)
   )
 )
@@ -118,24 +118,24 @@
   (map-get? sent-funds { owner: provider, token-id: token-id })
 )
 
-(define-public (add-staker (staker principal) (token-id uint))
+(define-public (add-staker (cover-provider principal) (token-id uint))
   (begin
 		(try! (is-pool-contract))
-    (print { type: "add-staker", payload: { token-id: token-id, staker: staker } })
-		(ok (map-set stakers { cover-provider: staker, token-id: token-id } true))
+    (print { type: "add-cover-provider", payload: { token-id: token-id, cover-provider: cover-provider } })
+		(ok (map-set cover-providers { cover-provider: cover-provider, token-id: token-id } true))
 	)
 )
 
-(define-public (remove-staker (staker principal) (token-id uint))
+(define-public (remove-staker (cover-provider principal) (token-id uint))
   (begin
 		(try! (is-pool-contract))
-    (print { type: "remove-staker", payload: { token-id: token-id, staker: staker } })
-		(ok (map-set stakers { cover-provider: staker, token-id: token-id } false))
+    (print { type: "remove-cover-provider", payload: { token-id: token-id, cover-provider: cover-provider } })
+		(ok (map-set cover-providers { cover-provider: cover-provider, token-id: token-id } false))
 	)
 )
 
 (define-read-only (is-staker (caller principal) (token-id uint))
-  (default-to false (map-get? stakers { cover-provider: caller, token-id: token-id }))
+  (default-to false (map-get? cover-providers { cover-provider: caller, token-id: token-id }))
 )
 
 (define-public (is-pool-contract)

@@ -1,5 +1,5 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 
 class BridgeTest {
   chain: Chain;
@@ -126,7 +126,7 @@ class BridgeTest {
   getSupplierById(supplerId: number, borrower: string) {
     return this.chain.mineBlock([
       Tx.contractCall(
-          `bridge`,
+          `magic-protocol`,
           "get-supplier",
           [
               types.uint(supplerId),

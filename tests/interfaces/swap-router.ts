@@ -1,4 +1,4 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 
 class SwapRouter {
   static getXgivenY(chain: Chain, xToken: string, yToken: string, dy: number, caller: string) {

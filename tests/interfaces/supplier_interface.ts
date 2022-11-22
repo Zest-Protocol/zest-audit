@@ -1,5 +1,5 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 
 class SupplierInterface {
   static sendFunds(
@@ -233,9 +233,10 @@ class SupplierInterface {
     preimage: string,
     loanId: number,
     lpToken: string,
+    lv: string,
     tokenId: number,
     xbtc: string,
-    caller: string
+    caller: string,
   ) {
     return Tx.contractCall(
       "supplier-interface",
@@ -245,6 +246,7 @@ class SupplierInterface {
         types.buff(Buffer.from(preimage,"hex")),
         types.uint(loanId),
         types.principal(lpToken),
+        types.principal(lv),
         types.uint(tokenId),
         types.principal(xbtc),
       ],
@@ -440,7 +442,7 @@ class SupplierInterface {
     tokenId: number,
     collToken: string,
     collVault: string,
-    liquidityVault: string,
+    fundingVault: string,
     btcVersion: string,
     btcHash: string,
     supplierId: number,
@@ -457,7 +459,7 @@ class SupplierInterface {
         types.uint(tokenId),
         types.principal(collToken),
         types.principal(collVault),
-        types.principal(liquidityVault),
+        types.principal(fundingVault),
         types.buff(Buffer.from(btcVersion, "hex")),
         types.buff(Buffer.from(btcHash, "hex")),
         types.uint(supplierId),
@@ -752,7 +754,7 @@ class SupplierInterface {
   }
 
   static getOutboundSwap(chain: Chain, swapId: number, caller: string) {
-    return chain.callReadOnlyFn(`bridge`, "get-outbound-swap", [ types.uint(swapId) ], caller).result;
+    return chain.callReadOnlyFn(`magic-protocol`, "get-outbound-swap", [ types.uint(swapId) ], caller).result;
   }
 
 

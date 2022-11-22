@@ -1,4 +1,4 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 
 class RewardsCalc {
   static polynomial(
@@ -34,7 +34,7 @@ class RewardsCalc {
         ],
         caller
       )
-    ]).receipts[0].result;
+    ]);
   }
 }
 

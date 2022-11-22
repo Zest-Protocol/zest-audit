@@ -70,7 +70,7 @@
 (define-public (set-loan-to-pool (loan-id uint) (pool-id uint))
   (begin
     (try! (is-pool-contract))
-    (print { type: "set-loan-to-pool", payload: { pool-id: pool-id, loan-id: loan-id } })
+    (print { type: "set-loan-to-pool", payload: { loan-id: loan-id, pool-id: pool-id } })
     (ok (map-set loans-pool loan-id pool-id))
   )
 )
@@ -103,7 +103,7 @@
   (begin
     (try! (is-pool-contract))
     (map-set pool-delegate token-id delegate)
-    (print { type: "set-pool-delegate", payloan: { token-id: token-id, delegate: delegate } })
+    (print { type: "set-pool-delegate", payload: { token-id: token-id, delegate: delegate } })
     (ok (map-set delegates delegate token-id))
   )
 )
@@ -135,7 +135,7 @@
     (try! (is-pool-contract))
     (asserts! (map-insert pool-data token-id data) ERR_POOL_ALREADY_EXISTS)
 
-    (print { type: "create-liquidity-pool", payload: data })
+    (print { type: "create-liquidity-pool", payload: { key: token-id, data: data } })
     (ok true)
   )
 )
@@ -191,7 +191,7 @@
     (try! (is-pool-contract))
     (map-set pool-data token-id data)
 
-    (print { type: "set-liquidity-pool", payload: data })
+    (print { type: "set-liquidity-pool", payload: { key: token-id, data:  data } })
     (ok true)
   )
 )
@@ -213,7 +213,7 @@
     (try! (is-pool-contract))
     (map-set funds-sent { owner: owner, token-id: token-id } data)
 
-    (print { event: "set-funds-sent", payload: data })
+    (print { type: "set-funds-sent", payload: { key: { owner: owner, token-id: token-id }, data:  data } })
     (ok true)
   )
 )
@@ -221,7 +221,7 @@
 (define-public (set-last-pool-id (id uint))
   (begin
     (try! (is-pool-contract))
-    (print { event: "set-last-pool-id", payload: { last-pool-id: id } })
+    (print { type: "set-last-pool-id", payload: { last-pool-id: id } })
     (ok (var-set last-pool-id id)))
 )
 
@@ -232,7 +232,7 @@
 (define-public (add-pool-governor (governor principal) (token-id uint))
   (begin
     (try! (is-pool-contract))
-    (print { event: "add-pool-governor", payload: { governor: governor, token-id: token-id } })
+    (print { type: "add-pool-governor", payload: { governor: governor, token-id: token-id } })
     (ok (map-set governors { governor: governor, token-id: token-id } true))
   )
 )
@@ -240,7 +240,7 @@
 (define-public (remove-pool-governor (governor principal) (token-id uint))
   (begin
     (try! (is-pool-contract))
-    (print { event: "remove-pool-governor", payload: { governor: governor, token-id: token-id } })
+    (print { type: "remove-pool-governor", payload: { governor: governor, token-id: token-id } })
     (ok (map-delete governors { governor: governor, token-id: token-id }))
   )
 )
@@ -257,7 +257,7 @@
 (define-public (add-liquidity-provider (token-id uint) (liquidity-provider principal))
   (begin
     (try! (is-pool-contract))
-    (print { event: "add-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
+    (print { type: "add-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
 		(ok (map-set liquidity-providers { token-id: token-id, lp: liquidity-provider } true))
 	)
 )
@@ -265,7 +265,7 @@
 (define-public (remove-liquidity-provider (token-id uint) (liquidity-provider principal))
   (begin
     (try! (is-pool-contract))
-    (print { event: "remove-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
+    (print { type: "remove-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
 		(ok (map-set liquidity-providers { token-id: token-id, lp: liquidity-provider } false))
 	)
 )

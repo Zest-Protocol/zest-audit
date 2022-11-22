@@ -1,5 +1,5 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 
 class Pool {
   chain: Chain;
@@ -141,11 +141,30 @@ class Pool {
     ]);
   }
 
+  triggerDefaultmode(
+    lpToken: string,
+    tokenId: number,
+    caller: string,
+  ) {
+    return this.chain.mineBlock([
+      Tx.contractCall(
+        "pool-v1-0",
+        "trigger-default-mode",
+        [
+          types.principal(lpToken),
+          types.uint(tokenId)
+        ],
+        caller
+      )
+    ])
+  }
+
   unwind(
     loanId: number,
     lp: string,
     tokenId: number,
     liquidityVault: string,
+    fundingVault: string,
     xbtc: string,
     delegate: string
     ) {
@@ -158,6 +177,7 @@ class Pool {
           types.principal(lp),
           types.uint(tokenId),
           types.principal(liquidityVault),
+          types.principal(fundingVault),
           types.principal(xbtc)
         ],
         delegate
@@ -272,6 +292,24 @@ class Pool {
     ]);
   }
 
+  addLiquidityProvider(
+    tokenId: number,
+    lp: string,
+    delegate: string,
+  ) {
+    return this.chain.mineBlock([
+      Tx.contractCall(
+        'pool-v1-0',
+        'add-liquidity-provider',
+        [
+          types.uint(tokenId),
+          types.principal(lp),
+        ],
+        delegate
+      )
+    ]);
+  }
+
   withdrawZestRewards(
     tokenId: number,
     zestRewardsContract: string,
@@ -296,6 +334,7 @@ class Pool {
     loanId: number,
     lpToken: string,
     tokenId: number,
+    lv: string,
     collateralVault: string,
     collToken: string,
     coverToken: string,
@@ -313,6 +352,7 @@ class Pool {
           types.uint(loanId),
           types.principal(lpToken),
           types.uint(tokenId),
+          types.principal(lv),
           types.principal(collateralVault),
           types.principal(collToken),
           types.principal(coverToken),
@@ -322,6 +362,77 @@ class Pool {
           types.principal(xbtc),
         ],
         poolDelegate
+      )
+    ]);
+  }
+
+  declareLoanLiquidated(
+    loanId: number,
+    lpToken: string,
+    tokenId: number,
+    collateralVault: string,
+    collToken: string,
+    spToken: string,
+    coverVault: string,
+    coverToken: string,
+    xbtc: string,
+    governor: string
+    ) {
+    return this.chain.mineBlock([
+      Tx.contractCall(
+        `pool-v1-0`,
+        "declare-loan-liquidated",
+        [
+          types.uint(loanId),
+          types.principal(lpToken),
+          types.uint(tokenId),
+          types.principal(collateralVault),
+          types.principal(collToken),
+          types.principal(spToken),
+          types.principal(coverVault),
+          types.principal(coverToken),
+          // types.principal(swapRouter),
+          types.principal(xbtc),
+        ],
+        governor
+      )
+    ]);
+  }
+
+  returnOtcLiquidation(
+    loanId: number,
+    lpToken: string,
+    tokenId: number,
+    collateralVault: string,
+    collToken: string,
+    fundsReturned: number,
+    lv: string,
+    xbtcRecovered: number,
+    spToken: string,
+    coverVault: string,
+    coverToken: string,
+    xbtc: string,
+    governor: string
+    ) {
+    return this.chain.mineBlock([
+      Tx.contractCall(
+        `pool-v1-0`,
+        "return-otc-liquidation",
+        [
+          types.uint(loanId),
+          types.principal(lpToken),
+          types.uint(tokenId),
+          types.principal(collateralVault),
+          types.principal(collToken),
+          types.uint(fundsReturned),
+          types.principal(lv),
+          types.uint(xbtcRecovered),
+          types.principal(spToken),
+          types.principal(coverVault),
+          types.principal(coverToken),
+          types.principal(xbtc),
+        ],
+        governor
       )
     ]);
   }
@@ -338,6 +449,32 @@ class Pool {
           types.principal(lv),
           types.principal(fv),
           types.principal(xbtc),
+        ],
+        delegate)
+    ]);
+  }
+
+  approveGovernor(governor: string, tokenId: number, delegate: string) {
+    return this.chain.mineBlock([
+      Tx.contractCall(
+        `pool-v1-0`,
+        "approve-governor",
+        [
+          types.principal(governor),
+          types.uint(tokenId),
+        ],
+        delegate)
+    ]);
+  }
+
+  removeGovernor(governor: string, tokenId: number, delegate: string) {
+    return this.chain.mineBlock([
+      Tx.contractCall(
+        `pool-v1-0`,
+        "removed-governor",
+        [
+          types.principal(governor),
+          types.uint(tokenId),
         ],
         delegate)
     ]);

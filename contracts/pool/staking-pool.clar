@@ -33,13 +33,13 @@
     (sp-contract (contract-of sp-token))
   )
     (try! (is-paused))
-    (asserts! (is-eq (get sp-contract pool-data) sp-contract) ERR_INVALID_SP)
+    (asserts! (contract-call? .globals is-sp sp-contract) ERR_INVALID_SP)
     (asserts! (is-eq (get status pool-data) READY) ERR_POOL_CLOSED)
     (asserts! (not (is-eq (get status pool-data) DEFAULT)) ERR_POOL_DEFAULT)
     (asserts! (is-eq caller contract-caller) ERR_UNAUTHORIZED)
     
     (map-set funds-sent caller { withdrawal-signaled: u0, amount: u0 })
-    (print { type: "send-funds-staking-pool", payload: { withdrawal-signaled: u0, amount: u0 } })
+    (print { type: "send-funds-staking-pool", payload: { key: caller, new-funds-sent: { withdrawal-signaled: u0, amount: u0 } } })
     
     (try! (contract-call? .zge000-governance-token transfer amount caller (as-contract tx-sender) none))
     (try! (contract-call? sp-token mint u0 (to-precision amount) caller))
@@ -67,7 +67,7 @@
     (withdrawn-funds (try! (contract-call? sp-token withdraw-rewards token-id recipient)))
   )
     (asserts! (is-eq recipient contract-caller) ERR_UNAUTHORIZED)
-    (asserts! (contract-call? .globals is-xbtc (contract-of sp-token)) ERR_INVALID_SP)
+    (asserts! (contract-call? .globals is-sp (contract-of sp-token)) ERR_INVALID_SP)
 
     (as-contract (try! (contract-call? .zge000-governance-token transfer withdrawn-funds (as-contract tx-sender) recipient none)))
     (print { type: "withdraw-rewards-staking-pool", payload: { amount: withdrawn-funds, caller: recipient } })
@@ -82,7 +82,7 @@
     (asserts! (is-eq caller contract-caller) ERR_UNAUTHORIZED)
     
     (map-set funds-sent caller (merge funds-sent-data { withdrawal-signaled: block-height, amount: amount }))
-    (print { type: "signal-withdrawal-staking-pool", payload: { withdrawal-signaled: block-height, amount: amount, caller: caller } })
+    (print { type: "signal-withdrawal-staking-pool", payload: { key: caller, new-funds-sent : { withdrawal-signaled: block-height, amount: amount }} })
     (ok true)
   )
 )
@@ -101,8 +101,10 @@
     (asserts! (< stx-time-delta (+ unstake-window cooldown-time)) ERR_UNSTAKE_WINDOW_EXPIRED)
     (asserts! (>= (get amount funds-sent-data) amount) ERR_EXCEEDED_SIGNALED_AMOUNT)
     (asserts! (is-eq caller contract-caller) ERR_UNAUTHORIZED)
+    (asserts! (contract-call? .globals is-sp (contract-of sp-token)) ERR_INVALID_SP)
     
     (as-contract (try! (contract-call? .zge000-governance-token transfer amount (as-contract tx-sender) caller none)))
+    (map-set funds-sent caller { withdrawal-signaled: u0, amount: u0 })
     (print { type: "withdraw-staking-pool", payload: { amount: amount, caller: caller } })
     ;; amount transferred is checked by the amount of sp-tokens being burned
     (contract-call? sp-token burn u0 (to-precision amount) caller)

@@ -73,7 +73,6 @@
   )
     (try! (caller-is-pool))
     (try! (can-borrow borrower))
-    ;; (asserts! (contract-call? .globals is-funding-vault funding-vault) ERR_INVALID_FV)
     (asserts! (contract-call? .globals is-coll-vault coll-vault) ERR_INVALID_CV)
     (asserts! (contract-call? .globals is-coll-contract (contract-of coll-token)) ERR_INVALID_COLL)
 
@@ -129,7 +128,6 @@
   )
     (try! (caller-is-pool))
     (asserts! (is-eq INIT (get status loan)) ERR_INVALID_STATUS)
-    ;; (asserts! (is-eq amount (get loan-amount loan)) ERR_NOT_AGREED_AMOUNT)
     (asserts! (<= (- burn-block-height (get created loan)) (get funding-period globals)) ERR_FUNDING_EXPIRED)
 
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
@@ -145,7 +143,7 @@
 ;;
 ;; @param loan-id: id of loan being funded
 ;; @param amount: amount the loan is being funded for
-(define-public (unwind (loan-id uint) (fv <v>) (lv-contract principal) (xbtc <ft>))
+(define-public (unwind (token-id uint) (loan-id uint) (fv <fv>) (lv <lv>) (xbtc <ft>))
   (let (
     (loan (try! (get-loan loan-id)))
     (globals (contract-call? .globals get-globals))
@@ -153,24 +151,19 @@
 
     (loan-amount (get loan-amount loan))
     (coll-ratio (get coll-ratio loan))
-
-    ;; (funding-period (get funding-period globals))
-    ;; (treasury-addr (get treasury globals))
     (treasury-portion (get-bp loan-amount (get treasury-fee globals)))
     (investor-portion (get-bp loan-amount (get investor-fee globals)))
-    ;; (delegate-portion (get-bp investor-portion delegate-fee))
-    ;; (lp-portion (- investor-portion delegate-portion))
     (borrow-amount (- loan-amount treasury-portion))
   )
     (try! (caller-is-pool))
     (asserts! (is-eq FUNDED (get status loan)) ERR_INVALID_STATUS)
     (asserts! (is-eq (contract-of fv) (get funding-vault loan)) ERR_INVALID_FV)
-    ;; (asserts! (>= amount (get loan-amount loan)) ERR_NOT_AGREED_AMOUNT)
     (asserts! (> (- burn-block-height (get created loan)) (get funding-period globals)) ERR_FUNDING_IN_PROGRESS)
     
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
 
-    (try! (contract-call? fv transfer loan-amount lv-contract xbtc))
+    (try! (contract-call? fv remove-asset xbtc loan-amount loan-id (as-contract tx-sender)))
+    (try! (as-contract (contract-call? lv add-asset xbtc loan-amount token-id tx-sender)))
 
     (ok (get loan-amount loan))
   )
@@ -193,7 +186,7 @@
   (loan-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (lv-principal principal)
   (lp-token <lp-token>)
   (token-id uint)
@@ -240,7 +233,7 @@
     )
 
     ;; for Magic Protocol
-    (try! (contract-call? fv transfer borrow-amount (get supplier-interface globals) xbtc))
+    (try! (contract-call? fv remove-asset xbtc borrow-amount loan-id (get supplier-interface globals)))
     ;; (try! (contract-call? fv transfer (+ treasury-portion delegate-portion) (get funding-vault loan) xbtc))
 
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
@@ -254,7 +247,7 @@
   (loan-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (lv-principal principal)
   (lp-token <lp-token>)
   (token-id uint)
@@ -272,7 +265,7 @@
     (investor-portion (get-bp loan-amount (get investor-fee globals)))
     (delegate-portion (get-bp investor-portion delegate-fee))
     (lp-portion (- investor-portion delegate-portion))
-    (borrow-amount (- loan-amount treasury-portion investor-portion))
+    (borrow-amount (- loan-amount treasury-portion))
     (new-loan (merge loan { status: ACTIVE, next-payment: (+ burn-block-height (get payment-period loan)) }))
   )
     (try! (caller-is-pool))
@@ -282,17 +275,15 @@
     (asserts! (is-eq (get coll-vault loan) (contract-of coll-vault)) ERR_INVALID_CV)
     
     ;; lp-rewards in liquidity-vault and add rewards
-    
-    ;; (try! (contract-call? lp-token add-rewards token-id lp-portion))
-    ;; (try! (contract-call? fv transfer delegate-portion pool-delegate xbtc))
-    (try! (contract-call? fv transfer treasury-portion (get treasury globals) xbtc))
+    (try! (contract-call? fv remove-asset xbtc treasury-portion loan-id (get treasury globals)))
     
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
 
     (try! (contract-call? .read-data active-loans-plus))
     (try! (contract-call? .read-data add-active-loan-amount token-id borrow-amount))
     (try! (contract-call? .read-data add-delegate-btc-rewards-earned pool-delegate delegate-portion))
-
+    
+    (print { type: "finalize-loan-drawdown", payload: { key: { loan-id: loan-id, token-id: token-id }, data: new-loan } })
 
     (ok { borrower: (get borrower loan), borrow-amount:  borrow-amount })
   )
@@ -340,8 +331,6 @@
     )
     
     ;; lp-rewards in liquidity-vault and add rewards
-    ;; (try! (contract-call? fv transfer loan-amount lv-principal xbtc))
-
     (try! (as-contract (contract-call? fv add-asset xbtc borrow-amount loan-id tx-sender)))
 
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
@@ -388,8 +377,6 @@
     (asserts! (is-eq ACTIVE (get status loan)) ERR_INVALID_STATUS)
     (asserts! (>= amount (get reward payment-response)) ERR_NOT_ENOUGH_PAID)
     ;; if repayment, assert amount being sent is greater than the total loan
-    ;; (asserts! (if (get repayment payment-response) (> amount (+ (get reward payment-response) (get loan-amount loan))) true) (err u9999))
-
     (let (
       (remaining-payments (get remaining-payments loan))
       (new-loan
@@ -403,6 +390,8 @@
     )
       (try! (contract-call? .loan-data set-loan loan-id new-loan))
     )
+
+    (print { type: "make-payment", payload: { key: { loan-id: loan-id, token-id: token-id }, data: loan, amount: amount } })
 
     ;; (try! (contract-call? .read-data add-pool-btc-rewards-earned token-id amount))
     (try! (contract-call? .read-data remove-active-loan-amount token-id amount))
@@ -454,11 +443,10 @@
 
       (try! (contract-call? .loan-data set-loan loan-id new-loan))
 
-      ;; (try! (contract-call? .read-data add-pool-btc-rewards-earned token-id amount))
       (try! (contract-call? .read-data active-loans-minus))
       (try! (contract-call? .read-data remove-active-loan-amount token-id amount))
 
-
+      (print { type: "make-repayment", payload: { key: { loan-id: loan-id, token-id: token-id }, data: loan, amount: amount } })
       (ok payment-response)
     )
   )
@@ -509,15 +497,16 @@
     (loan (try! (get-loan loan-id)))
     (has-collateral (> (get coll-ratio loan) u0))
     (withdrawn-funds (if has-collateral (try! (withdraw-collateral coll-vault coll-token loan-id recipient)) u0))
+    (new-loan (merge loan { status: LIQUIDATED }))
+    (globals (contract-call? .globals get-globals))
   )
     (try! (caller-is-pool))
     (asserts! (can-liquidate loan-id) ERR_INVALID_STATUS)
     (asserts! (is-eq (contract-of coll-vault) (get coll-vault loan)) ERR_INVALID_CV)
     (asserts! (is-eq (contract-of coll-token) (get coll-token loan)) ERR_INVALID_COLL)
-    ;; (asserts! (> burn-block-height (+ (get grace-period globals) (get next-payment loan))) ERR_LOAN_IN_PROGRESS)
 
-
-    (ok true)
+    (try! (contract-call? .loan-data set-loan loan-id new-loan))
+    (ok withdrawn-funds)
   )
 )
 
@@ -657,7 +646,7 @@
   (loan-id uint)
   (coll-type <ft>)
   (cv <cv>)
-  (fv <v>)
+  (fv <fv>)
   (swap-router <swap>)
   (token-id uint)
   (xbtc <ft>)
@@ -788,7 +777,7 @@
         (treasury-portion (get-bp new-amount (get treasury-fee globals)))
         (borrow-amount (- new-amount treasury-portion))
       )
-        (try! (contract-call? fv transfer borrow-amount (get supplier-interface globals) xbtc))
+        (try! (contract-call? fv remove-asset xbtc borrow-amount loan-id (get supplier-interface globals)))
         (try! (contract-call? .loan-data set-rollover-progress loan-id (merge (unwrap-panic (get-rollover-progress loan-id)) { sent-funds: (to-int borrow-amount) })))
         (ok borrow-amount)
       )
@@ -814,7 +803,7 @@
   (loan-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (token-id uint)
   (xbtc <ft>)
   )
@@ -842,7 +831,7 @@
     (asserts! (is-eq (get status rollover) COMPLETED) ERR_UNAUTHORIZED)
     (asserts! (< (- block-height (get created-at rollover)) (get funding-period globals)) ERR_FUNDING_EXPIRED)
 
-    (try! (contract-call? fv transfer treasury-portion treasury-addr xbtc))
+    (try! (contract-call? fv remove-asset xbtc treasury-portion loan-id treasury-addr))
 
     
     (try! (contract-call? .loan-data delete-rollover-progress loan-id))

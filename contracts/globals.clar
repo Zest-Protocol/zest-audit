@@ -417,6 +417,7 @@
 (define-public (set-pool-contract (contract principal))
   (begin
     (try! (is-contract-owner))
+    (print { type: "set-pool-contract", payload: { contract: contract } })
     (ok (var-set pool-contract contract))
   )
 )
@@ -424,6 +425,7 @@
 (define-public (set-loan-contract (contract principal))
   (begin
     (try! (is-contract-owner))
+    (print { type: "set-loan-contract", payload: { contract: contract } })
     (ok (var-set loan-contract contract))
   )
 )
@@ -431,6 +433,7 @@
 (define-public (set-cover-pool-contract (contract principal))
   (begin
     (try! (is-contract-owner))
+    (print { type: "set-cover-pool-contract", payload: { contract: contract } })
     (ok (var-set cover-pool-contract contract))
   )
 )
@@ -491,6 +494,7 @@
   )
 		(try! (is-contract-owner))
     (map-set onboarded-user user (+ u1 num-adds))
+    (print { type: "onboard-user", payload: { key: { user: user },  btc-version: btc-version, btc-hash: btc-hash } })
     (ok (map-set onboarded-address { user: user, btc-version: btc-version, btc-hash: btc-hash } true))
   )
 )
@@ -502,6 +506,7 @@
 		(try! (is-contract-owner))
     (asserts! (> num-adds u0) ERR_ALREADY_OFFBOARDED)
     (map-set onboarded-user user (- num-adds u1))
+    (print { type: "offboard-user", payload: { key: { user: user },  btc-version: btc-version, btc-hash: btc-hash } })
     (ok (map-delete onboarded-address { user: user, btc-version: btc-version, btc-hash: btc-hash }))
   )
 )
@@ -512,6 +517,7 @@
 (define-public (add-admin (admin principal))
   (begin
 		(try! (is-contract-owner))
+    (print { type: "add-admin", payload: { key: { admin: admin }} })
 		(ok (map-set admins admin true))
 	)
 )
@@ -519,6 +525,7 @@
 (define-public (remove-admin (admin principal))
   (begin
 		(try! (is-contract-owner))
+    (print { type: "remove-admin", payload: { key: { admin: admin }} })
 		(ok (map-set admins admin false))
 	)
 )
@@ -534,6 +541,7 @@
 (define-public (add-governor (governor principal))
   (begin
 		(try! (is-contract-owner))
+    (print { type: "add-governor", payload: { key: { governor: governor }} })
 		(ok (map-set governors governor true))
 	)
 )
@@ -541,6 +549,7 @@
 (define-public (remove-governor (governor principal))
   (begin
 		(try! (is-contract-owner))
+    (print { type: "remove-governor", payload: { key: { governor: governor }} })
 		(ok (map-set governors governor false))
 	)
 )
@@ -550,7 +559,7 @@
 )
 
 (map-set rewards-calcs .rewards-calc true)
-(map-set swaps .swap-router-dummy true)
+(map-set swaps .swap-router true)
 (map-set swaps .swap-router-xbtc-xusd true)
 (map-set cps .cp-token true)
 (map-set lps .lp-token true)

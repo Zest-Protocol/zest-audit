@@ -79,7 +79,7 @@
     (try! (is-loan-contract))
     (asserts! (map-insert loan loan-id data) ERR_LOAN_ALREADY_EXISTS)
 
-    (print { type: "create-loan", payload: (merge data { loan-id: loan-id }) })
+    (print { type: "create-loan", payload: { key : loan-id, data: data } })
     (ok loan-id)
   )
 )
@@ -105,7 +105,7 @@
     (try! (is-loan-contract))
     (map-set loan loan-id data)
 
-    (print { type: "set-loan", payload: (merge data { loan-id: loan-id }) })
+    (print { type: "set-loan", payload: { key: loan-id, data: data } })
     (ok true)
   )
 )
@@ -130,7 +130,7 @@
     (try! (is-loan-contract))
     (asserts! (map-insert rollover-progress loan-id data) ERR_ROLLOVER_PROGRESS_ALREADY_EXISTS)
 
-    (print { type: "create-rollover-progress", payload: (merge data { loan-id: loan-id }) })
+    (print { type: "create-rollover-progress", payload: { key: loan-id, data: data } })
     (ok true)
   )
 )
@@ -155,7 +155,7 @@
     (map-set rollover-progress loan-id data)
 
 
-    (print { type: "set-rollover-progress", payload: (merge data { loan-id: loan-id }) })
+    (print { type: "set-rollover-progress", payload: { key: loan-id, data: data } })
     (ok true)
   )
 )

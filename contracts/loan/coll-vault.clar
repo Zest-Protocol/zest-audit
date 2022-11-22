@@ -39,7 +39,7 @@
     (try! (contract-call? coll-type transfer amount sender (as-contract tx-sender) none))
     (map-insert loan-coll loan-id data)
 
-    (print { type: "store-coll-vault", payload: (merge data { loan-id: loan-id }) })
+    (print { type: "store-coll-vault", payload: { key: loan-id, contract: (contract-of coll-type), amount: amount } })
     (ok true)
   )
 )
@@ -61,7 +61,7 @@
     (try! (contract-call? coll-type transfer amount sender (as-contract tx-sender) none))
     (map-set loan-coll loan-id { coll-type: (contract-of coll-type), amount: (+ (get amount coll) amount) })
 
-    (print { type: "add-collateral-coll-vault", payload: (merge data { loan-id: loan-id }) })
+    (print { type: "add-collateral-coll-vault", payload: { key: loan-id, contract: (contract-of coll-type), amount: amount } })
     (ok true)
   )
 )
@@ -84,7 +84,7 @@
     (try! (as-contract (contract-call? coll-type transfer amount tx-sender recipient none)))
     (map-set loan-coll loan-id { coll-type: (contract-of coll-type), amount: (- (get amount coll) amount) })
 
-    (print { type: "remove-collateral-coll-vault", payload: (merge data { loan-id: loan-id }) })
+    (print { type: "remove-collateral-coll-vault", payload: { key: loan-id, contract: (contract-of coll-type), amount: amount } })
     (ok true)
   )
 )
@@ -107,7 +107,7 @@
     (try! (as-contract (contract-call? coll-type transfer (get amount coll) sender recipient none)))
     (map-delete loan-coll loan-id)
 
-    (print { type: "coll-vault-delete", payload: { loan-id: loan-id } })
+    (print { type: "coll-vault-delete", payload: { key: loan-id, contract: (contract-of coll-type), amount: (get amount coll) } })
     (ok (get amount coll))
   )
 )

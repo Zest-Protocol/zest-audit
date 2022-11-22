@@ -1,0 +1,38 @@
+---
+id: 0
+name: Testnet deployment
+network: testnet
+stacks-node: "http://stacks-node-api.testnet.stacks.co"
+bitcoin-node: "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - contract-publish:
+            contract-name: funding-vault
+            expected-sender: ST3ZKF3SDKWTG6X67G57K1GQJZJWGY9K2TJ88WJSW
+            cost: 32610
+            path: contracts/loan/funding-vault.clar
+            anchor-block-only: true
+            clarity-version: 1
+        - contract-publish:
+            contract-name: swap-router
+            expected-sender: ST3ZKF3SDKWTG6X67G57K1GQJZJWGY9K2TJ88WJSW
+            cost: 35730
+            path: contracts/swap-router.clar
+            anchor-block-only: true
+            clarity-version: 1
+        - contract-publish:
+            contract-name: cover-vault
+            expected-sender: ST3ZKF3SDKWTG6X67G57K1GQJZJWGY9K2TJ88WJSW
+            cost: 36780
+            path: contracts/pool/cover-vault.clar
+            anchor-block-only: true
+            clarity-version: 1
+        - contract-publish:
+            contract-name: rewards-read
+            expected-sender: ST3ZKF3SDKWTG6X67G57K1GQJZJWGY9K2TJ88WJSW
+            cost: 18220
+            path: contracts/rewards-read.clar
+            anchor-block-only: true
+            clarity-version: 1

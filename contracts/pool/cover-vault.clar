@@ -49,7 +49,7 @@
     (try! (contract-call? asset transfer amount sender (as-contract tx-sender) none))
     (map-set assets token-id (+ asset-amount amount))
 
-    (print { type: "add-asset-cover-vault", payload: { amount: (+ asset-amount amount), token-id: token-id, sender: sender } })
+    (print { type: "add-asset-cover-vault", payload: { key: token-id, data: { amount: (+ asset-amount amount) }} })
 
     (ok (+ asset-amount amount))
   )
@@ -61,16 +61,15 @@
   )
     (try! (is-approved-contract contract-caller))
     (try! (as-contract (contract-call? asset transfer amount tx-sender recipient none)))
-    (print { asset-amount: asset-amount, amount: amount })
     (if (>= amount asset-amount)
       (begin
         (map-set assets token-id u0)
-        (print { type: "remove-asset-cover-vault", payload: { amount: u0, token-id: token-id, recipient: recipient } })
+        (print { type: "remove-asset-cover-vault", payload: { key: token-id, data: { amount: u0 }} })
         (ok u0)
       )
       (begin
         (map-set assets token-id (- asset-amount amount))
-        (print { type: "remove-asset-cover-vault", payload: { amount: (- asset-amount amount), token-id: token-id, recipient: recipient } })
+        (print { type: "remove-asset-cover-vault", payload: { key: token-id, data: { amount: (- asset-amount amount) }} })
         (ok (- asset-amount amount))
       )
     )
@@ -85,7 +84,7 @@
     (try! (as-contract (contract-call? asset transfer asset-amount tx-sender recipient none)))
     (map-delete assets token-id)
     
-    (print { type: "draw-cover-vault", payload: { amount: asset-amount, token-id: token-id, recipient: recipient } })
+    (print { type: "draw-cover-vault", payload: { key: token-id, data: { amount: none }} })
     (ok asset-amount)
   )
 )

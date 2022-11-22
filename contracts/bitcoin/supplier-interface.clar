@@ -36,7 +36,7 @@
   )
     (asserts! (map-insert escrowed-tx tx-id (get height block)) ERR_TX_ESCROWED)
     (print tx-id)
-    (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge escrow-swap block prev-blocks tx proof output-index sender recipient expiration-buff hash swapper-buff supplier-id min-to-receive))
+    (try! (contract-call? .magic-protocol escrow-swap block prev-blocks tx proof output-index sender recipient expiration-buff hash swapper-buff supplier-id min-to-receive))
     (ok true)
   )
 )
@@ -113,7 +113,7 @@
   (let (
     (tx-id (contract-call? .clarity-bitcoin get-txid tx))
   )
-    (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge escrow-swap block prev-blocks tx proof output-index sender recipient expiration-buff hash swapper-buff supplier-id min-to-receive))
+    (try! (contract-call? .magic-protocol escrow-swap block prev-blocks tx proof output-index sender recipient expiration-buff hash swapper-buff supplier-id min-to-receive))
     (let (
       (swap (try! (finalize-priv tx-id preimage xbtc-ft)))
       (fee (get fee swap))
@@ -128,8 +128,8 @@
 
 (define-private (finalize-priv (txid (buff 32)) (preimage (buff 128)) (xbtc-ft <ft>))
   (let (
-    (swap-resp (as-contract (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge finalize-swap txid preimage))))
-    (swap (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge get-full-inbound txid)))
+    (swap-resp (as-contract (try! (contract-call? .magic-protocol finalize-swap txid preimage))))
+    (swap (try! (contract-call? .magic-protocol get-full-inbound txid)))
     (swapper (get swapper-principal swap))
     (sats (get sats swap))
     (xbtc (get xbtc swap))
@@ -141,6 +141,49 @@
     (ok (merge swap { fee: fee }))
   )
 )
+
+;; (define-public (make-payment-wrap
+;;   (block { header: (buff 80), height: uint })
+;;   (prev-blocks (list 10 (buff 80)))
+;;   (tx (buff 1024))
+;;   (proof { tx-index: uint, hashes: (list 12 (buff 32)), tree-depth: uint })
+;;   (output-index uint)
+;;   (sender (buff 33))
+;;   (recipient (buff 33))
+;;   (expiration-buff (buff 4))
+;;   (hash (buff 32))
+;;   (swapper-buff (buff 4))
+;;   (supplier-id uint)
+;;   (min-to-receive uint)
+;;   (preimage (buff 128))
+;;   (loan-id uint)
+;;   (payment <payment>)
+;;   (lp-token <lp-token>)
+;;   (token-id uint)
+;;   (cp-token <cp-token>)
+;;   (cp-rewards-token <dt>)
+;;   (zp-token <dt>)
+;;   (swap-router <swap>)
+;;   (xbtc-ft <ft>)
+;;   )
+;;   (let (
+;;     (tx-id (contract-call? .clarity-bitcoin get-txid tx))
+;;   )
+;;     (asserts! (map-insert escrowed-tx tx-id (get height block)) ERR_TX_ESCROWED)
+;;     (try! (contract-call? .magic-protocol escrow-swap block prev-blocks tx proof output-index sender recipient expiration-buff hash swapper-buff supplier-id min-to-receive))
+;;     (let (
+;;     (swap (try! (finalize-priv tx-id preimage xbtc-ft)))
+;;     (fee (get fee swap))
+;;     (xbtc (get xbtc swap))
+;;     (swap-hash (get hash swap))
+;;     (height (unwrap! (map-get? escrowed-tx tx-id) ERR_TX_DOES_NOT_EXIST))
+;;     (swapper (get swapper-principal swap))
+;;     )
+;;       (map-delete escrowed-tx tx-id)
+;;       (ok (try! (contract-call? .loan-v1-0 make-payment loan-id height payment lp-token token-id cp-token cp-rewards-token zp-token swap-router (get sats swap) xbtc-ft contract-caller)))
+;;     )
+;;   )
+;; )
 
 (define-public (make-payment
   (txid (buff 32))
@@ -174,6 +217,7 @@
   (preimage (buff 128))
   (loan-id uint)
   (lp-token <lp-token>)
+  (lv <lv>)
   (token-id uint)
   (xbtc-ft <ft>)
   )
@@ -186,7 +230,7 @@
     (swapper (get swapper-principal swap))
   )
     (map-delete escrowed-tx txid)
-    (ok (try! (contract-call? .pool-v1-0 make-residual-payment loan-id lp-token token-id (get sats swap) xbtc-ft contract-caller)))
+    (ok (try! (contract-call? .pool-v1-0 make-residual-payment loan-id lp-token token-id lv (get sats swap) xbtc-ft contract-caller)))
   )
 )
 
@@ -287,7 +331,7 @@
       (asserts! (contract-call? .globals is-onboarded-address-read contract-caller btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED)
     )
     (try! (contract-call? .pool-v1-0 withdraw lp-token zp-token token-id lv xbtc xbtc-ft contract-caller))
-    (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge initiate-outbound-swap xbtc btc-version btc-hash supplier-id))
+    (try! (contract-call? .magic-protocol initiate-outbound-swap xbtc btc-version btc-hash supplier-id))
     (print { btc-version: btc-version, btc-hash: btc-hash, supplier-id: supplier-id, amount: xbtc })
     (ok true)
   )
@@ -328,8 +372,7 @@
       (asserts! (contract-call? .globals is-onboarded-address-read contract-caller btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED)
     )
     (print { btc-version: btc-version, btc-hash: btc-hash, supplier-id: supplier-id, amount: withdrawn-funds })
-    ;; (try! (contract-call? .xbtc transfer withdrawn-funds tx-sender (as-contract tx-sender) none))
-    (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge initiate-outbound-swap withdrawn-funds btc-version btc-hash supplier-id))
+    (try! (contract-call? .magic-protocol initiate-outbound-swap withdrawn-funds btc-version btc-hash supplier-id))
     (ok withdrawn-funds)
   )
 )
@@ -351,7 +394,7 @@
       true
       (asserts! (contract-call? .globals is-onboarded-address-read contract-caller btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED)
     )
-    (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge initiate-outbound-swap withdrawn-funds btc-version btc-hash supplier-id))
+    (try! (contract-call? .magic-protocol initiate-outbound-swap withdrawn-funds btc-version btc-hash supplier-id))
     (ok withdrawn-funds)
   )
 )
@@ -395,7 +438,7 @@
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (btc-version (buff 1))
   (btc-hash (buff 20))
   (supplier-id uint)
@@ -405,11 +448,10 @@
   (let (
     (pool (try! (contract-call? .pool-v1-0 get-pool token-id)))
     (xbtc (try! (contract-call? .pool-v1-0 drawdown loan-id lp-token token-id coll-token coll-vault fv swap-router xbtc-ft contract-caller)))
-    (swap-id (try! (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge initiate-outbound-swap xbtc btc-version btc-hash supplier-id))))
+    (swap-id (try! (as-contract (contract-call? .magic-protocol initiate-outbound-swap xbtc btc-version btc-hash supplier-id))))
     (liquidity (try! (get-current-liquidity)))
   )
     (asserts! (contract-call? .globals is-onboarded-address-read contract-caller btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED)
-    ;; (print { liquidity: liquidity, result: (>= liquidity xbtc) })
     (asserts! (>= liquidity xbtc) ERR_NOT_ENOUGH_LIQUIDITY)
     (print { btc-version: btc-version, btc-hash: btc-hash, supplier-id: supplier-id, amount: xbtc })
     (ok { swap-id: swap-id, sats: xbtc })
@@ -422,7 +464,7 @@
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (xbtc-ft <ft>)
   (block { header: (buff 80), height: uint })
   (prev-blocks (list 10 (buff 80)))
@@ -432,7 +474,7 @@
   (swap-id uint)
   )
   (begin
-    (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge finalize-outbound-swap block prev-blocks tx proof output-index swap-id))
+    (try! (contract-call? .magic-protocol finalize-outbound-swap block prev-blocks tx proof output-index swap-id))
     (contract-call? .pool-v1-0 finalize-drawdown loan-id lp-token token-id coll-token coll-vault fv xbtc-ft)
   )
 )
@@ -443,7 +485,7 @@
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (btc-version (buff 1))
   (btc-hash (buff 20))
   (supplier-id uint)
@@ -453,7 +495,7 @@
   (let (
     (pool (try! (contract-call? .pool-v1-0 get-pool token-id)))
     (xbtc (try! (contract-call? .pool-v1-0 complete-rollover loan-id lp-token token-id coll-token coll-vault fv swap-router xbtc-ft contract-caller)))
-    (swap-id (if (> xbtc u0) (try! (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge initiate-outbound-swap xbtc btc-version btc-hash supplier-id))) u0) )
+    (swap-id (if (> xbtc u0) (try! (as-contract (contract-call? .magic-protocol initiate-outbound-swap xbtc btc-version btc-hash supplier-id))) u0) )
     (liquidity (try! (get-current-liquidity)))
   )
     (asserts! (contract-call? .globals is-onboarded-address-read contract-caller btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED)
@@ -468,7 +510,7 @@
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (xbtc-ft <ft>)
   (block { header: (buff 80), height: uint })
   (prev-blocks (list 10 (buff 80)))
@@ -478,7 +520,7 @@
   (swap-id uint)
   )
   (begin
-    (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge finalize-outbound-swap block prev-blocks tx proof output-index swap-id))
+    (try! (contract-call? .magic-protocol finalize-outbound-swap block prev-blocks tx proof output-index swap-id))
     (contract-call? .pool-v1-0 finalize-rollover loan-id lp-token token-id coll-token coll-vault fv xbtc-ft)
   )
 )
@@ -494,7 +536,7 @@
   (swap-id uint)
   )
   (let (
-    (swap (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge revoke-expired-outbound swap-id)))
+    (swap (try! (contract-call? .magic-protocol revoke-expired-outbound swap-id)))
     (recovered-amount (get xbtc swap))
   )
     ;; (try! (as-contract (contract-call? fv add-asset xbtc-ft recovered-amount loan-id tx-sender)))
@@ -515,7 +557,7 @@
   (swap-id uint)
   )
   (let (
-    (swap (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge revoke-expired-outbound swap-id)))
+    (swap (try! (contract-call? .magic-protocol revoke-expired-outbound swap-id)))
     (recovered-amount (get xbtc swap))
   )
     ;; (try! (as-contract (contract-call? xbtc-ft transfer recovered-amount tx-sender (contract-of fv) none)))
@@ -531,7 +573,7 @@
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (swap-router <swap>)
   (xbtc-ft <ft>)
   )
@@ -555,7 +597,7 @@
   (swap-id uint)
   )
   (begin
-    (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge finalize-outbound-swap block prev-blocks tx proof output-index swap-id)
+    (contract-call? .magic-protocol finalize-outbound-swap block prev-blocks tx proof output-index swap-id)
   )
 )
 
@@ -572,21 +614,21 @@
   )
   (begin
     (try! (validate-owner))
-    (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge register-supplier public-key inbound-fee outbound-fee outbound-base-fee inbound-base-fee funds))
+    (as-contract (contract-call? .magic-protocol register-supplier public-key inbound-fee outbound-fee outbound-base-fee inbound-base-fee funds))
   )
 )
 
 (define-public (add-funds (amount uint))
   (begin
     (try! (validate-owner))
-    (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge add-funds amount))
+    (as-contract (contract-call? .magic-protocol add-funds amount))
   )
 )
 
 (define-public (remove-funds (amount uint))
   (begin
     (try! (validate-owner))
-    (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge remove-funds amount))
+    (as-contract (contract-call? .magic-protocol remove-funds amount))
   )
 )
 
@@ -600,8 +642,8 @@
   )
   (begin
     (try! (validate-owner))
-    (try! (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge update-supplier-fees inbound-fee outbound-fee outbound-base-fee inbound-base-fee)))
-    (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge update-supplier-public-key public-key))
+    (try! (as-contract (contract-call? .magic-protocol update-supplier-fees inbound-fee outbound-fee outbound-base-fee inbound-base-fee)))
+    (as-contract (contract-call? .magic-protocol update-supplier-public-key public-key))
   )
 )
 
@@ -616,7 +658,7 @@
 ;; internal
 
 (define-private (withdraw-bridge (amount uint))
-  (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge remove-funds amount))
+  (as-contract (contract-call? .magic-protocol remove-funds amount))
 )
 
 ;; helpers
@@ -650,7 +692,7 @@
   (begin
     (asserts! (contract-call? .globals is-governor contract-caller) ERR_UNAUTHORIZED)
     (if (> height (var-get highest-set-liquidity)) (var-set highest-set-liquidity height) false)
-    (print { event: "updated_liquidity", height: height, liquidity: liquidity })
+    (print { type: "updated_liquidity", payload: { height: height, liquidity: liquidity } })
     (ok (map-set bridge-liquidity height liquidity))
   )
 )

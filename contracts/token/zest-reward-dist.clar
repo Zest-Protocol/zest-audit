@@ -79,7 +79,7 @@
 		(set-balance token-id (- sender-balance amount) sender)
 		(set-balance token-id (+ (get-balance-uint token-id recipient) amount) recipient)
 		(try! (ft-transfer? zest-dist amount sender recipient))
-		(print {type: "sft_transfer", token-id: token-id, amount: amount, sender: sender, recipient: recipient})
+		(print { type: "sft_transfer", token-id: token-id, amount: amount, sender: sender, recipient: recipient})
 		(ok true)
 	)
 )
@@ -187,10 +187,8 @@
     (start-cycle (unwrap-panic (get-cycle-at token-id (get sent-at-stx funds-sent))))
     (last-commitment-cycle (+ (get factor funds-sent) start-cycle))
     (end-cycle (+ (get factor funds-sent) start-cycle))
-    ;; (end-cycle (if (> last-commitment-cycle current-cycle) current-cycle last-commitment-cycle))
     (sum (unwrap-panic (get-sum-cycles (+ u1 start-cycle) end-cycle token-id recipient)))
     (withdrawable-funds (withdrawable-funds-of-read token-id recipient))
-    ;; (passive-rewards (if (> current-cycle end-cycle) (- withdrawable-funds sum) u0))
     (last-claim-at (get last-claim-at funds-sent))
     (start-passive (if (is-eq last-claim-at u0) last-commitment-cycle last-claim-at))
     (delta (if (> current-cycle last-commitment-cycle)
@@ -198,9 +196,7 @@
       u0
     ))
     (commitment-total (get-balance-uint token-id recipient))
-    ;; (passive-rewards (if (> current-cycle end-cycle) (- withdrawable-funds sum) u0))
     (passive-rewards (* delta commitment-total))
-    ;; (passive-rewards u0)
   )
     { cycle-rewards: sum, passive-rewards: (/ passive-rewards FOUR_EXP) }
   )
@@ -217,7 +213,7 @@
     (try! (is-approved-contract contract-caller))
     (set-rewards token-id delta block-height)
     (map-set points-per-share token-id total-points-shared)
-    (print { type: "added_funds", added-points: added-points })
+    (print { type: "added_funds", payload: added-points })
     (ok total-points-shared)
   )
 )
@@ -231,7 +227,7 @@
 		(map-set token-supplies token-id (+ (unwrap-panic (get-total-supply token-id)) amount))
     (mint-priv token-id amount recipient)
 
-		(print {type: "sft_mint", token-id: token-id, amount: amount, recipient: recipient})
+		(print { type: "sft_mint_zest_reward_dist", payload: { key: { token-id: token-id, recipient: recipient }, amount: amount } })
 		(ok true)
 	)
 )
@@ -243,7 +239,7 @@
     (set-balance token-id (- (get-balance-uint token-id owner) amount) owner)
 		(map-set token-supplies token-id (- (unwrap-panic (get-total-supply token-id)) amount))
     (burn-priv token-id amount owner)
-		(print {type: "sft_burn", token-id: token-id, amount: amount, owner: owner})
+		(print { type: "sft_burn_zest_reward_dist", payload: { key: { token-id: token-id, owner: owner }, amount: amount } })
     (ok true)
 	)
 )
@@ -368,7 +364,6 @@
         (portion (/ (* rewards-in-cycle funds-sent-in-cycle) share-in-cycle))
       )
         ;; add to cycle amounts sent
-        ;; (map-set funds-sent-cycle { token-id: token-id, cycle: current-cycle } (- share-in-cycle funds-sent-in-cycle))
         (map-delete funds-sent-cycle-by-principal { token-id: token-id, cycle: current-cycle, user: caller })
         ;; add to funds sent by the user
         { token-id: (get token-id result), first-cycle: (get first-cycle result), period: (get period result), caller: caller }
@@ -394,8 +389,6 @@
     (current-cycle (+ cycle-idx (get first-cycle result)))
     (caller (get caller result))
     (token-id (get token-id result))
-    ;; (rewards-in-cycle (get-cycle-rewards token-id current-cycle))
-    ;; (share-in-cycle (get-cycle-share token-id current-cycle))
     (funds-sent-in-cycle (get-cycle-share-principal token-id current-cycle caller))
   )
     (if (and (> (unwrap-panic (get-current-cycle (get token-id result))) current-cycle) (> funds-sent-in-cycle u0))
@@ -405,7 +398,6 @@
         (portion (/ (/ (* rewards-in-cycle funds-sent-in-cycle) total-in-cycle) POINTS_MULTIPLIER ))
       )
         ;; add to cycle amounts sent
-        ;; (map-set funds-sent-cycle { token-id: token-id, cycle: current-cycle } (- share-in-cycle funds-sent-in-cycle))
         (map-delete funds-sent-cycle-by-principal { token-id: token-id, cycle: current-cycle, user: caller })
         ;; add to funds sent by the user
         { token-id: (get token-id result), first-cycle: (get first-cycle result), period: (get period result), total: (+ (get total result) portion), caller: caller}

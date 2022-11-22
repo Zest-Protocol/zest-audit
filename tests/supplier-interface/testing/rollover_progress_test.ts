@@ -1,7 +1,7 @@
 // deno-lint-ignore-file
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
-import { assertEquals, assert } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
+import { assertEquals, assert } from 'https://deno.land/std@0.159.0/testing/asserts.ts';
 import { Pool } from '../../interfaces/pool-v1-0.ts';
 import { CoverPool } from '../../interfaces/cover-pool-v1-0.ts';
 import { Loan } from '../../interfaces/loan-v1-0.ts';
@@ -15,6 +15,7 @@ import { Payment } from '../../interfaces/payment.ts';
 import { SwapRouter } from '../../interfaces/swap-router.ts';
 import { CollVault } from '../../interfaces/coll-vault.ts';
 import { ClarityBitcoin } from '../../interfaces/clarity_bitcoin.ts';
+import { LiquidityVault } from '../../interfaces/liquidity-vault.ts';
 import { 
   getHash,
   getReverseTxId,
@@ -144,7 +145,7 @@ Clarinet.test({
     let treasuryHoldingsBefore = (chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.protocol-treasury"]);
     let treasuryFee = getBP(REQUESTED_AMOUNT - LOAN_AMOUNT, consumeUint(globals["treasury-fee"]));
 
-    block = chain.mineBlock([...finalizeRollover(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC, HASH, 199400000, swapId, chain.blockHeight - 1, deployerWallet.address, deployerWallet.address )]);
+    block = chain.mineBlock([...finalizeRollover(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC, HASH, 199_400_000, swapId, chain.blockHeight - 1, deployerWallet.address, deployerWallet.address )]);
     block.receipts[1].result.expectOk();
 
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.protocol-treasury"] - treasuryHoldingsBefore, treasuryFee);
@@ -199,7 +200,7 @@ Clarinet.test({
     let globals = Globals.getGlobals(chain, deployerWallet.address).expectTuple();
     let totalInvestorFees = getBP(LOAN_AMOUNT, consumeUint(globals["treasury-fee"]) + consumeUint(globals["investor-fee"]));
 
-    block = chain.mineBlock([...finalizeDrawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC, HASH, 99700000, 0, 28, wallet_8.address, deployerWallet.address)]);
+    block = chain.mineBlock([...finalizeDrawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC, HASH, 99700000, 0, chain.blockHeight - 1, wallet_8.address, deployerWallet.address)]);
 
     let loanDataBefore = (loan.getLoanData(0).result.expectTuple());
 
@@ -209,10 +210,14 @@ Clarinet.test({
     let rolloverData = (loan.getRolloverData(0).result.expectTuple());
     rolloverData["status"].expectBuff(Buffer.from("02", "hex"));
     block = pool.completeRolloverNoWithdrawal(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, SWAP_ROUTER, XBTC, wallet_8.address);
+    let expectedNextPayment = block.height + 1440 - 2;
+    // rolloverData = (loan.getRolloverData(0).result.expectTuple());
+    // rolloverData["moved-collateral"].expectInt(0);
 
     let loanDataAfter = (loan.getLoanData(0).result.expectTuple());
 
-    assertEquals({ ...loanDataBefore, ...{ "next-payment": "u1467" }}, loanDataAfter);
+    // expect nothing else to change but expected payment time
+    assertEquals({ ...loanDataBefore, ...{ "next-payment": `u${expectedNextPayment}` }}, loanDataAfter);
   },
 });
 
@@ -270,12 +275,13 @@ Clarinet.test({
     let rolloverData = (loan.getRolloverData(0).result.expectTuple());
     rolloverData["status"].expectBuff(Buffer.from("02", "hex"));
     block = pool.completeRolloverNoWithdrawal(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, SWAP_ROUTER, XBTC, wallet_8.address);
+    let expectedNextPayment = block.height + 1440 - 2;
     // rolloverData = (loan.getRolloverData(0).result.expectTuple());
     // rolloverData["moved-collateral"].expectInt(0);
 
     let loanDataAfter = (loan.getLoanData(0).result.expectTuple());
 
-    assertEquals({ ...loanDataBefore, ...{ "next-payment": "u1467", "apr": "u350" }}, loanDataAfter);
+    assertEquals({ ...loanDataBefore, ...{ "next-payment": `u${expectedNextPayment}`, "apr": "u350" }}, loanDataAfter);
   },
 });
 
@@ -328,16 +334,18 @@ Clarinet.test({
     let loanDataBefore = (loan.getLoanData(0).result.expectTuple());
 
     const REQUESTED_AMOUNT = LOAN_AMOUNT;
-    block = loan.requestRollover(0, null, null, 51840, 4320, 0, XBTC, wallet_8.address);
+    const newPeriod = 4320;
+    block = loan.requestRollover(0, null, null, 51840, newPeriod, 0, XBTC, wallet_8.address);
     block = pool.acceptRollover(0, LP_TOKEN, 0, LIQUIDITY_VAULT,FUNDING_VAULT, XBTC, wallet_7.address);
     let rolloverData = (loan.getRolloverData(0).result.expectTuple());
     rolloverData["status"].expectBuff(Buffer.from("02", "hex"));
     block = pool.completeRolloverNoWithdrawal(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, SWAP_ROUTER, XBTC, wallet_8.address);
+    let expectedNextPayment = block.height + newPeriod - 2;
     // rolloverData = (loan.getRolloverData(0).result.expectTuple());
     // rolloverData["moved-collateral"].expectInt(0);
 
     let loanDataAfter = (loan.getLoanData(0).result.expectTuple());
-    assertEquals({ ...loanDataBefore, ...{ "next-payment": "u4347", "remaining-payments": "u12", "payment-period": "u4320" }}, loanDataAfter);
+    assertEquals({ ...loanDataBefore, ...{ "next-payment": `u${expectedNextPayment}`, "remaining-payments": "u12", "payment-period": "u4320" }}, loanDataAfter);
   },
 });
 
@@ -355,6 +363,7 @@ Clarinet.test({
     let pool = new Pool(chain, deployerWallet);
     let loan = new Loan(chain, deployerWallet);
     let coverPool = new CoverPool(chain, deployerWallet);
+    let lv  = new LiquidityVault(chain, LIQUIDITY_VAULT, deployerWallet);
 
     let block = runBootstrap(chain, deployerWallet);
     block = Globals.onboardUserAddress(chain, wallet_8.address, P2PKH_VERSION, HASH, deployerWallet.address);
@@ -398,20 +407,21 @@ Clarinet.test({
 
     block = chain.mineBlock([
       Bridge.initializeSwapper(wallet_8.address),
-      ...makeResidualPayment(deployerWallet.address, wallet_8.address,sender,recipient,500,1,RESIDUAL,"01",0,minPaymentToReceive,0,LP_TOKEN,0,chain.blockHeight - 1, XBTC)
+      ...makeResidualPayment(deployerWallet.address, wallet_8.address,sender,recipient,500,1,RESIDUAL,"01",0,minPaymentToReceive,0,LP_TOKEN,LIQUIDITY_VAULT,0,chain.blockHeight - 1, XBTC)
     ])
+    lv.getAsset(0).result.expectOk().expectSome().expectUint(RESIDUAL);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"], RESIDUAL);
     rolloverData = (loan.getRolloverData(0).result.expectTuple());
     rolloverData["residual"].expectUint(0);
     rolloverData["sent-funds"].expectInt(-RESIDUAL);
 
-    let renewheight = chain.blockHeight;
+    let renewheight = chain.blockHeight - 1;
     block = pool.completeRolloverNoWithdrawal(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, SWAP_ROUTER, XBTC, wallet_8.address);
     // rolloverData["moved-collateral"].expectInt(0);
     // block.receipts[0].result.expectOk().expectUint(0);
 
     let loanData = (loan.getLoanData(0).result.expectTuple());
-    loanData["next-payment"].expectUint(renewheight + consumeUint(loanData["payment-period"]) - 1);
+    loanData["next-payment"].expectUint(renewheight + consumeUint(loanData["payment-period"]));
   },
 });
 
@@ -531,6 +541,7 @@ Clarinet.test({
     rolloverData["status"].expectBuff(Buffer.from("02", "hex"));
 
     block = pool.completeRolloverNoWithdrawal(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, SWAP_ROUTER, XBTC, wallet_8.address);
+    // rolloverData = (loan.getRolloverData(0).result.expectTuple());
     
     let collateralAmount = (consumeUint(SwapRouter.getXgivenY(chain, XUSD_CONTRACT_SIMNET, XBTC, LOAN_AMOUNT, deployerWallet.address).expectOk()) * COLL_RATIO / 10000);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coll-vault"], collateralAmount);
@@ -594,8 +605,10 @@ Clarinet.test({
     rolloverData["status"].expectBuff(Buffer.from("02", "hex"));
 
     block = pool.completeRolloverNoWithdrawal(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, SWAP_ROUTER, XBTC, wallet_8.address);
+    // rolloverData = (loan.getRolloverData(0).result.expectTuple());
     
     let collateralAmount = (consumeUint(SwapRouter.getXgivenY(chain, XUSD_CONTRACT_SIMNET, XBTC, LOAN_AMOUNT, deployerWallet.address).expectOk()) * COLL_RATIO / 10000);
+    // rolloverData["moved-collateral"].expectInt(collateralAmount);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coll-vault"], collateralAmount);
 
     loan.getRolloverDataOptional(0).result.expectNone();
@@ -656,6 +669,7 @@ Clarinet.test({
     rolloverData["coll-type"].expectPrincipal(XUSD_CONTRACT_SIMNET);
     rolloverData["status"].expectBuff(Buffer.from("02", "hex"));
 
+    // let collateralAmountAtLoanCreation = (chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coll-vault"]);
     let collateralAmountAtLoanCreation = consumeUint(CollVault.getLoanColl(chain, COLL_VAULT, 0, deployerWallet.address).expectOk().expectTuple()["amount"]);
     let expectedFinalCollateral = (consumeUint(SwapRouter.getXgivenY(chain, XUSD_CONTRACT_SIMNET, XBTC, LOAN_AMOUNT, deployerWallet.address).expectOk()) * COLL_RATIO / 10000);
     
@@ -723,6 +737,7 @@ Clarinet.test({
     rolloverData["coll-type"].expectPrincipal(XUSD_CONTRACT_SIMNET);
     rolloverData["status"].expectBuff(Buffer.from("02", "hex"));
 
+    // let collateralAmountAtLoanCreation = (chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coll-vault"]);
     let collateralAmountAtLoanCreation = consumeUint(CollVault.getLoanColl(chain, COLL_VAULT, 0, deployerWallet.address).expectOk().expectTuple()["amount"]);
     let expectedFinalCollateral = (consumeUint(SwapRouter.getXgivenY(chain, XUSD_CONTRACT_SIMNET, XBTC, LOAN_AMOUNT, deployerWallet.address).expectOk()) * COLL_RATIO / 10000);
 
@@ -1176,7 +1191,8 @@ Clarinet.test({
     
     let collateralInVault = (chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coll-vault"]);
     block = pool.completeRolloverNoWithdrawal(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, SWAP_ROUTER, XBTC, wallet_8.address);
-    
+    // console.log(block.receipts[0].events);
+    // console.log(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]);
     loanData = (loan.getLoanData(0).result.expectTuple());
     loanData["coll-ratio"].expectUint(COLL_RATIO);
 
@@ -1249,12 +1265,15 @@ Clarinet.test({
     let assetMapXusd = (chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]);
     block = chain.mineBlock([SupplierInterface.completeRollover(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER, XBTC, wallet_8.address)]);
     rolloverData = (loan.getRolloverData(0).result.expectTuple());
+    // console.log(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"])
+    // console.log(rolloverData);
+    // rolloverData["moved-collateral"].expectInt(collateralRequiredAfter);
     rolloverData["sent-funds"].expectInt(REQUESTED_AMOUNT - LOAN_AMOUNT - totalInvestorFees);
 
     chain.mineEmptyBlock(500);
     block = chain.mineBlock([SupplierInterface.cancelRollover(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, XBTC, 1, wallet_8.address)]);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.funding-vault"], assetMapXbtc["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.funding-vault"]);
-    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"], assetMapXbtc["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"]);
+    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"], assetMapXbtc["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"]);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coll-vault"], 0);
   },
 });
@@ -1337,7 +1356,7 @@ Clarinet.test({
     chain.mineEmptyBlock(500);
     block = chain.mineBlock([SupplierInterface.cancelRollover(0, LP_TOKEN, 0, XUSD_CONTRACT_SIMNET, COLL_VAULT, FUNDING_VAULT, XBTC, 1, wallet_8.address)]);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.funding-vault"], assetMapXbtc["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.funding-vault"]);
-    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"], assetMapXbtc["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"]);
+    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"], assetMapXbtc["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"]);
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-USD.wrapped-usd"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.coll-vault"], collateralRequiredBefore);
   },
 });

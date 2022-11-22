@@ -14,10 +14,10 @@ cache_location=".requirements"
 boot_contracts = ["pox", "costs-v1", "bns"]
 
 [contracts.after-deployment]
-path = "contracts/after-deployment.clar"
+path = "contracts/after-deployment-simnet.clar"
 
-[contracts.bridge]
-path = "contracts/bitcoin/magic-bridge/bridge.clar"
+[contracts.magic-protocol]
+path = "contracts/bitcoin/magic-protocol/magic-protocol.clar"
 
 # [contracts.swap-router-xbtc-xusd]
 # path = "contracts/swap-router-xbtc-xusd.clar"
@@ -25,9 +25,6 @@ path = "contracts/bitcoin/magic-bridge/bridge.clar"
 
 [contracts.clarity-bitcoin]
 path = "contracts/bitcoin/test/clarity-bitcoin.clar"
-
-# [contracts.clarity-bitcoin]
-# path = "contracts/bitcoin/test/clarity-bitcoin.clar"
 
 [contracts.coll-vault]
 path = "contracts/loan/coll-vault.clar"
@@ -82,9 +79,6 @@ depends_on = ["executor-dao"]
 
 [contracts.lp-token-trait]
 path = "contracts/trait/lp-token-trait.clar"
-
-# [contracts.onboarding]
-# path = "contracts/onboarding.clar"
 
 [contracts.ownable-trait]
 path = "contracts/trait/ownable-trait.clar"
@@ -157,9 +151,6 @@ depends_on = ["pool-v1-0"]
 
 [contracts.swap-router]
 path = "contracts/swap-router.clar"
-
-[contracts.usda-token]
-path = "contracts/usda-token.clar"
 
 [contracts.swap-router-trait]
 path = "contracts/trait/swap-router-trait.clar"

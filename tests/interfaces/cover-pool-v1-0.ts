@@ -1,4 +1,4 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
+import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
 
 class CoverPool {
   chain: Chain;
@@ -101,6 +101,7 @@ class CoverPool {
     coverToken: string,
     tokenId: number,
     amount: number,
+    coverVault: string,
     caller: string,
   ) {
     return this.chain.mineBlock([
@@ -112,7 +113,8 @@ class CoverPool {
           types.principal(cpRewards),
           types.principal(coverToken),
           types.uint(tokenId),
-          types.uint(amount)
+          types.uint(amount),
+          types.principal(coverVault),
         ],
         caller
       )

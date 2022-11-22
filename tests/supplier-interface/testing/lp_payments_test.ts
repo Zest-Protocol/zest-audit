@@ -1,16 +1,17 @@
 // deno-lint-ignore-file
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { assertEquals, assert } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
+import { assertEquals, assert } from 'https://deno.land/std@0.159.0/testing/asserts.ts';
 import { Pool } from '../../interfaces/pool-v1-0.ts';
 import { CoverPool } from '../../interfaces/cover-pool-v1-0.ts';
 import { Loan } from '../../interfaces/loan-v1-0.ts';
 import { LPToken } from '../../interfaces/lp-token.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 import { TestUtils } from '../../interfaces/test-utils.ts';
 import { Bridge } from '../../interfaces/bridge_real.ts';
 import { Globals } from '../../interfaces/globals.ts';
 import { SupplierInterface } from '../../interfaces/supplier_interface.ts';
 import { Payment } from '../../interfaces/payment.ts';
+import { LiquidityVault } from '../../interfaces/liquidity-vault.ts';
 import { 
   getHash,
   getReverseTxId,
@@ -100,11 +101,17 @@ Clarinet.test({
 
     block = chain.mineBlock([...finalizeDrawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC, HASH, 99700000, 0, 28, wallet_8.address, deployerWallet.address)]);
 
+    // chain.mineEmptyBlock(10);
+
     chain.mineEmptyBlockUntil(consumeUint(loan.getLoanData(0).result.expectTuple()["next-payment"]) - 1);
+    // console.log(consumeUint(loan.getLoanData(0).result.expectTuple()["next-payment"]));
+
+    // chain.mineEmptyBlock(1300);
 
     let prev = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"];
 
     let regularPaymentDue = (consumeUint(Payment.getCurrentLoanPayment(chain, 0, wallet_8.address)));
+    // console.log(regularPaymentDue);
     let delegateFee = Math.floor(consumeUint(pool.getPool(0)["delegate-fee"]) / 10000 * regularPaymentDue);
     let minPaymentToReceive =  Math.floor(regularPaymentDue * fee / 10_000);
 
@@ -112,10 +119,12 @@ Clarinet.test({
       Bridge.initializeSwapper(wallet_8.address),
       ...makePaymentTxs(deployerWallet.address, wallet_8.address,sender,recipient,500,1,regularPaymentDue,"00",0,minPaymentToReceive,0, PAYMENT, LP_TOKEN,LIQUIDITY_VAULT, 0, CP_TOKEN, CP_REWARDS_TOKEN, ZP_TOKEN, SWAP_ROUTER,chain.blockHeight - 1, XBTC)
     ]);
+    // console.log(block);
 
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"] - prev, regularPaymentDue - delegateFee);
     
     chain.mineEmptyBlock(1440);
+
     prev = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"];
 
     block = chain.mineBlock([
@@ -137,7 +146,9 @@ Clarinet.test({
     let pool = new Pool(chain, deployerWallet);
     let loan = new Loan(chain, deployerWallet);
 
+    // let block = runBootstrap(chain, deployerWallet);
     let block = Globals.onboardUserAddress(chain, wallet_8.address, P2PKH_VERSION, HASH, deployerWallet.address);
+    // loan.addBorrower(wallet_8.address, deployerWallet.address);
 
     pool.createPool(wallet_7.address,LP_TOKEN,ZP_TOKEN,PAYMENT,REWARDS_CALC,1000,1000,10_000_000_000,10_000_000_000,1,MAX_MATURITY_LENGTH,LIQUIDITY_VAULT,CP_TOKEN,COVER_VAULT,CP_REWARDS_TOKEN,XBTC,true);
     pool.finalizePool(wallet_7.address, LP_TOKEN, ZP_TOKEN, CP_TOKEN, 0);
@@ -246,7 +257,9 @@ Clarinet.test({
     let pool = new Pool(chain, deployerWallet);
     let loan = new Loan(chain, deployerWallet);
 
+    // let block = runBootstrap(chain, deployerWallet);
     let block = Globals.onboardUserAddress(chain, wallet_8.address, P2PKH_VERSION, HASH, deployerWallet.address);
+    // loan.addBorrower(wallet_8.address, deployerWallet.address);
 
     pool.createPool(wallet_7.address,LP_TOKEN,ZP_TOKEN,PAYMENT,REWARDS_CALC,1000,1000,10_000_000_000,10_000_000_000,1,MAX_MATURITY_LENGTH,LIQUIDITY_VAULT,CP_TOKEN,COVER_VAULT,CP_REWARDS_TOKEN,XBTC,true);
     pool.finalizePool(wallet_7.address, LP_TOKEN, ZP_TOKEN, CP_TOKEN, 0);
@@ -263,7 +276,7 @@ Clarinet.test({
     pool.createLoan(LP_TOKEN,0,100_000_000,XBTC,0,XBTC,300,12960,1440,COLL_VAULT,FUNDING_VAULT,wallet_8.address);
     pool.fundLoan(0,LP_TOKEN,0,LIQUIDITY_VAULT,FUNDING_VAULT,XBTC,wallet_7.address);
     chain.mineBlock([SupplierInterface.updateLiquidity(chain.blockHeight, 100_000_000, deployerWallet.address)]);
-    chain.mineBlock([SupplierInterface.drawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, LIQUIDITY_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)]);
+    chain.mineBlock([SupplierInterface.drawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, P2PKH_VERSION, HASH, 0, SWAP_ROUTER,XBTC, wallet_8.address)]);
 
     block = chain.mineBlock([...finalizeDrawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC, HASH, 99000000, 0, 28, wallet_8.address, deployerWallet.address)]);
 
@@ -311,6 +324,8 @@ Clarinet.test({
 
     block = chain.mineBlock([...finalizeDrawdown(0, LP_TOKEN, 0, XBTC, COLL_VAULT, FUNDING_VAULT, XBTC, HASH, 99700000, 0, 28, wallet_8.address, deployerWallet.address)]);
 
+    chain.mineEmptyBlock(10);
+
     chain.mineEmptyBlock(1440);
 
     let globals = Globals.getGlobals(chain, deployerWallet.address).expectTuple();
@@ -345,6 +360,7 @@ Clarinet.test({
     let assetMaps = chain.getAssetsMaps();
     let pool = new Pool(chain, deployerWallet);
     let loan = new Loan(chain, deployerWallet);
+    let lv  = new LiquidityVault(chain, LIQUIDITY_VAULT, deployerWallet);
 
     let block = Globals.onboardUserAddress(chain, wallet_8.address, P2PKH_VERSION, HASH, deployerWallet.address);
     let DAY = consumeUint(Globals.getDayLengthDefault(chain, deployerWallet.address));
@@ -378,7 +394,7 @@ Clarinet.test({
     ]);
     block.receipts[3].result.expectOk();
 
-    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"], 9999700000 - regularPaymentDue);
+    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"], 9999700000 - regularPaymentDue);
   },
 });
 

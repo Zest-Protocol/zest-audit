@@ -1,5 +1,5 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 
 class Bridge {
     static escrowSwap(
@@ -17,7 +17,7 @@ class Bridge {
       caller: string,
       ) {
       return Tx.contractCall(
-        "bridge",
+        "magic-protocol",
         'escrow-swap',
         [
           types.tuple({
@@ -53,7 +53,7 @@ class Bridge {
       caller: string
     ) {
       return Tx.contractCall(
-        "bridge",
+        "magic-protocol",
         'register-supplier',
         [
           types.buff(Buffer.from(publicKey, "hex")),
@@ -71,7 +71,7 @@ class Bridge {
       caller: string
     ) {
       return Tx.contractCall(
-          "bridge",
+          "magic-protocol",
           'initialize-swapper',
           [],
           caller
@@ -84,7 +84,7 @@ class Bridge {
       caller: string
     ) {
       return Tx.contractCall(
-          "bridge",
+          "magic-protocol",
           'finalize-swap',
           [
             types.buff(Buffer.from(txid,"hex")),
@@ -99,7 +99,7 @@ class Bridge {
     }
 
     static getSupplier(chain:Chain, supplierId: number, caller: string) {
-      return chain.callReadOnlyFn(`bridge`, "get-supplier", [ types.uint(supplierId) ], caller).result;
+      return chain.callReadOnlyFn(`magic-protocol`, "get-supplier", [ types.uint(supplierId) ], caller).result;
     }
 
 }

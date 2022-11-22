@@ -1,4 +1,4 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 
 class CPToken {
   chain: Chain;
@@ -23,6 +23,19 @@ class CPToken {
   withdrawableFundsOf(cpToken: string, caller: string) {
     return this.chain.callReadOnlyFn(`${this.deployer.address}.${cpToken}`, "withdrawable-funds-of", [
       types.principal(caller),
+    ], this.deployer.address);
+  }
+
+  recognizableLossesOf(cpToken: string, tokenId: number, caller: string) {
+    return this.chain.callReadOnlyFn(`${this.deployer.address}.${cpToken}`, "recognizable-losses-of-read", [
+      types.uint(tokenId),
+      types.principal(caller),
+    ], this.deployer.address);
+  }
+
+  getLossesPerShare(cpToken: string, tokenId: number) {
+    return this.chain.callReadOnlyFn(`${this.deployer.address}.${cpToken}`, "get-losses-per-share", [
+      types.uint(tokenId),
     ], this.deployer.address);
   }
 

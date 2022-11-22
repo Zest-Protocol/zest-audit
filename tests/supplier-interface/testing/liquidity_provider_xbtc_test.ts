@@ -1,11 +1,11 @@
 // deno-lint-ignore-file
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
-import { assertEquals, assert } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
+import { assertEquals, assert } from 'https://deno.land/std@0.159.0/testing/asserts.ts';
 import { Pool } from '../../interfaces/pool-v1-0.ts';
 import { CoverPool } from '../../interfaces/cover-pool-v1-0.ts';
 import { Loan } from '../../interfaces/loan-v1-0.ts';
 import { LPToken } from '../../interfaces/lp-token.ts';
-import { Buffer } from "https://deno.land/std@0.110.0/node/buffer.ts";
+import { Buffer } from "https://deno.land/std@0.159.0/node/buffer.ts";
 import { TestUtils } from '../../interfaces/test-utils.ts';
 import { Bridge } from '../../interfaces/bridge_real.ts';
 import { Globals } from '../../interfaces/globals.ts';
@@ -72,6 +72,8 @@ Clarinet.test({
     let loan = new Loan(chain, deployerWallet);
     let coverPool = new CoverPool(chain, deployerWallet);
 
+    // runBootstrap(chain, deployerWallet);
+    
     // Pool is created by Deployer. Pool Delegate is assigned.
     pool.createPool(delegate_1.address,LP_TOKEN,ZP_TOKEN,PAYMENT,REWARDS_CALC,1000,1000,10_000_000_000,10_000_000_000,1,MAX_MATURITY_LENGTH,LIQUIDITY_VAULT,CP_TOKEN,COVER_VAULT,CP_REWARDS_TOKEN,XBTC,true);
     // Cover Pool Provider sends funds to the cover pool of Pool 0.
@@ -107,7 +109,64 @@ Clarinet.test({
     block = chain.mineBlock([SupplierInterface.withdrawXBTC(100_000_000,LP_TOKEN,ZP_TOKEN,0,LIQUIDITY_VAULT,XBTC,LP_1.address)]);
     block.receipts[0].result.expectOk();
     
-    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][LP_1.address], 10_000_000_000);
+    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][LP_1.address], 100_000_000_000_000);
+  },
+});
+
+
+Clarinet.test({
+  name: "Liquidity providers can send xBTC and withdraw",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    let deployerWallet = accounts.get("deployer") as Account;
+    let LP_1 = accounts.get("wallet_1") as Account; // LP_1
+    let LP_2 = accounts.get("wallet_2") as Account; // LP_2
+    let coverPoolProvider = accounts.get("wallet_3") as Account; // Cover_1
+    let delegate_1 = accounts.get("wallet_7") as Account; // Delegate_1
+    let borrower_1 = accounts.get("wallet_8") as Account; // borrower_1
+
+    let assetMaps = chain.getAssetsMaps();
+    let pool = new Pool(chain, deployerWallet);
+    let loan = new Loan(chain, deployerWallet);
+    let coverPool = new CoverPool(chain, deployerWallet);
+
+    // runBootstrap(chain, deployerWallet);
+    
+    // Pool is created by Deployer. Pool Delegate is assigned.
+    let block = pool.createPool(delegate_1.address,LP_TOKEN,ZP_TOKEN,PAYMENT,REWARDS_CALC,1000,1000,10_000_000_000,10_000_000_000,6,MAX_MATURITY_LENGTH,LIQUIDITY_VAULT,CP_TOKEN,COVER_VAULT,CP_REWARDS_TOKEN,XBTC,true);
+    // Cover Pool Provider sends funds to the cover pool of Pool 0.
+    block = pool.finalizePool(delegate_1.address, LP_TOKEN, ZP_TOKEN, CP_TOKEN, 0);
+    
+    block = Globals.setcontingencyPlan(chain, true, deployerWallet.address);
+    block = chain.mineBlock([
+      SupplierInterface.sendFundsXBTC(6,LP_TOKEN,0,ZP_TOKEN,LIQUIDITY_VAULT,XBTC,100_000_000, REWARDS_CALC, LP_1.address)
+    ]);
+
+    let globals = Globals.getGlobals(chain, deployerWallet.address).expectTuple();
+    let cooldownTime = consumeUint(globals["lp-cooldown-period"]);
+    let unstakeWindow = consumeUint(globals["lp-unstake-window"]);
+
+    block = pool.signalWithdrawal(LP_TOKEN,0, 100_000_000, LP_1.address);
+
+    chain.mineEmptyBlock(cooldownTime - 11);
+    // lockup period in progress even after cooldown period
+
+    block = chain.mineBlock([SupplierInterface.withdrawXBTC(100_000_000,LP_TOKEN,ZP_TOKEN,0,LIQUIDITY_VAULT,XBTC,LP_1.address)]);
+    block.receipts[0].result.expectErr().expectUint(ERRORS.ERR_FUNDS_LOCKED);
+
+    // wait arbitraririly large number
+    chain.mineEmptyBlock((cooldownTime * 2));
+
+    block = chain.mineBlock([SupplierInterface.withdrawXBTC(100_000_000,LP_TOKEN,ZP_TOKEN,0,LIQUIDITY_VAULT,XBTC,LP_1.address)]);
+    block.receipts[0].result.expectErr().expectUint(ERRORS.ERR_UNSTAKE_WINDOW_EXPIRED);
+
+    pool.signalWithdrawal(LP_TOKEN,0, 100_000_000, LP_1.address);
+    
+    chain.mineEmptyBlock(cooldownTime);
+
+    block = chain.mineBlock([SupplierInterface.withdrawXBTC(100_000_000,LP_TOKEN,ZP_TOKEN,0,LIQUIDITY_VAULT,XBTC,LP_1.address)]);
+    block.receipts[0].result.expectErr().expectUint(ERRORS.ERR_FUNDS_LOCKED);
+    
+    // assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][LP_1.address], 100_000_000_000_000);
   },
 });
 

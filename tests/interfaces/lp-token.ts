@@ -1,4 +1,4 @@
-import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.3/index.ts';
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 
 class LPToken {
     chain: Chain;
@@ -10,14 +10,14 @@ class LPToken {
     }
 
     withdrawFunds(lpToken: string, lender: string) {
-        return this.chain.mineBlock([
-            Tx.contractCall(
-                `${lpToken}`,
-                "withdraw-rewards",
-                [],
-                lender
-            )
-        ]);
+      return this.chain.mineBlock([
+        Tx.contractCall(
+          `${lpToken}`,
+          "withdraw-rewards",
+          [],
+          lender
+        )
+      ]);
     }
 
     withdrawableFundsOf(lpToken: string, caller: string) {
@@ -37,6 +37,12 @@ class LPToken {
       return this.chain.callReadOnlyFn(`${this.deployer.address}.${lpToken}`, "get-balance", [
         types.uint(tokenId),
         types.principal(owner),
+      ], this.deployer.address);
+    }
+
+    getLossesPerShare(lpToken: string, tokenId: number) {
+      return this.chain.callReadOnlyFn(`${this.deployer.address}.${lpToken}`, "get-losses-per-share", [
+        types.uint(tokenId),
       ], this.deployer.address);
     }
 }

@@ -17,7 +17,7 @@
     (try! (contract-call? xbtc transfer amount sender (as-contract tx-sender) none))
     (map-set vault-funds loan-id (+ funds amount))
 
-    (print { type: "add-asset-funding-vault", payload: { amount: (+ funds amount), loan-id: loan-id, sender: sender } })
+    (print { type: "add-asset-funding-vault", payload: { key: loan-id,  data: { amount: amount }} })
     
     (ok (+ funds amount))
   )
@@ -31,7 +31,7 @@
     (try! (as-contract (contract-call? xbtc transfer amount tx-sender recipient none)))
     (map-set vault-funds loan-id (- asset amount))
 
-    (print { type: "remove-asset-funding-vault", payload: { amount: (- asset amount), loan-id: loan-id, recipient: recipient } })
+    (print { type: "remove-asset-funding-vault", payload: { key: loan-id, data: { amount: amount }} })
     (ok (- asset amount))
   )
 )
@@ -44,7 +44,7 @@
     (try! (as-contract (contract-call? xbtc transfer asset tx-sender recipient none)))
     (map-delete vault-funds loan-id)
 
-    (print { type: "draw-funding-vault", payload: { loan-id: loan-id, recipient: recipient, amount: asset } })
+    (print { type: "draw-funding-vault", payload: { key: loan-id, data: { amount: asset }} })
 
     (ok asset)
   )
