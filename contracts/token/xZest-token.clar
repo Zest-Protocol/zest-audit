@@ -1,109 +1,83 @@
 ;; holds Zest rewards to Stakers
-
 (impl-trait .distribution-token-trait.distribution-token-trait)
 (impl-trait .ownable-trait.ownable-trait)
 
 (use-trait ft .ft-trait.ft-trait)
-
 
 (define-fungible-token zest-dist)
 (define-map token-balances {token-id: uint, owner: principal} uint)
 (define-map token-supplies uint uint)
 (define-map token-uris uint (string-ascii 256))
 
-
-;; (define-data-var contract-owner principal .executor-dao)
 (define-data-var contract-owner principal tx-sender)
 (define-constant ERR_UNAUTHORIZED (err u1000))
 
 ;; -- sip-010 functions
-
 (define-private (set-balance (token-id uint) (balance uint) (owner principal))
-	(map-set token-balances {token-id: token-id, owner: owner} balance)
-)
+	(map-set token-balances {token-id: token-id, owner: owner} balance))
 
 (define-read-only (get-balance-uint (token-id uint) (who principal))
-	(default-to u0 (map-get? token-balances {token-id: token-id, owner: who}))
-)
+	(default-to u0 (map-get? token-balances {token-id: token-id, owner: who})))
 
 (define-read-only (get-balance (token-id uint) (who principal))
-	(ok (get-balance-uint token-id who))
-)
+	(ok (get-balance-uint token-id who)))
 
 (define-read-only (get-overall-balance (who principal))
-	(ok (ft-get-balance zest-dist who))
-)
+	(ok (ft-get-balance zest-dist who)))
 
 (define-read-only (get-total-supply-uint (token-id uint))
-	(default-to u0 (map-get? token-supplies token-id))
-)
+	(default-to u0 (map-get? token-supplies token-id)))
 
 (define-read-only (get-total-supply (token-id uint))
-	(ok (get-total-supply-uint token-id))
-)
+	(ok (get-total-supply-uint token-id)))
 
 (define-read-only (get-overall-supply)
-	(ok (ft-get-supply zest-dist))
-)
+	(ok (ft-get-supply zest-dist)))
 
 (define-read-only (get-decimals (token-id uint))
-	(ok u0)
-)
+	(ok u0))
 
 (define-public (set-token-uri (token-id uint) (value (string-ascii 256)))
   (begin
     (asserts! (is-eq tx-sender (var-get contract-owner)) ERR_UNAUTHORIZED)
-    (ok (map-set token-uris token-id value))
-  )
-)
+    (ok (map-set token-uris token-id value))))
 
 (define-read-only (get-token-uri (token-id uint))
-	(ok (map-get? token-uris token-id))
-)
+	(ok (map-get? token-uris token-id)))
 
 (define-public (transfer (token-id uint) (amount uint) (sender principal) (recipient principal))
-  (let
-		(
-			(sender-balance (get-balance-uint token-id sender))
-      (points-mag (to-int (* amount (get-points-per-share token-id))))
-      (points-correction-from (+ (get-points-correction token-id sender) points-mag))
-      (points-correction-to (+ (get-points-correction token-id recipient) points-mag))
-		)
+  (let (
+    (sender-balance (get-balance-uint token-id sender))
+    (points-mag (to-int (* amount (get-points-per-share token-id))))
+    (points-correction-from (+ (get-points-correction token-id sender) points-mag))
+    (points-correction-to (+ (get-points-correction token-id recipient) points-mag)))
     (map-set points-correction { token-id: token-id, owner: sender } points-correction-from)
     (map-set points-correction { token-id: token-id, owner: recipient } points-correction-to)
-		(asserts! (is-eq sender contract-caller) ERR_UNAUTHORIZED)
+		(asserts! (is-eq sender tx-sender) ERR_UNAUTHORIZED)
 		(asserts! (<= amount sender-balance) ERR_INSUFFICIENT_BALANCE)
 		(set-balance token-id (- sender-balance amount) sender)
 		(set-balance token-id (+ (get-balance-uint token-id recipient) amount) recipient)
 		(try! (ft-transfer? zest-dist amount sender recipient))
 		(print {type: "sft_transfer", token-id: token-id, amount: amount, sender: sender, recipient: recipient})
-		(ok true)
-	)
-)
+		(ok true)))
 
 (define-public (transfer-memo (token-id uint) (amount uint) (sender principal) (recipient principal) (memo (buff 34)))
 	(begin
 		(try! (transfer token-id amount sender recipient))
 		(print memo)
-		(ok true)
-	)
-)
+		(ok true)))
 
 (define-private (transfer-many-iter (item {token-id: uint, amount: uint, sender: principal, recipient: principal}) (previous-response (response bool uint)))
-	(match previous-response prev-ok (transfer (get token-id item) (get amount item) (get sender item) (get recipient item)) prev-err previous-response)
-)
+	(match previous-response prev-ok (transfer (get token-id item) (get amount item) (get sender item) (get recipient item)) prev-err previous-response))
 
 (define-public (transfer-many (transfers (list 200 {token-id: uint, amount: uint, sender: principal, recipient: principal})))
-	(fold transfer-many-iter transfers (ok true))
-)
+	(fold transfer-many-iter transfers (ok true)))
 
 (define-private (transfer-many-memo-iter (item {token-id: uint, amount: uint, sender: principal, recipient: principal, memo: (buff 34)}) (previous-response (response bool uint)))
-	(match previous-response prev-ok (transfer-memo (get token-id item) (get amount item) (get sender item) (get recipient item) (get memo item)) prev-err previous-response)
-)
+	(match previous-response prev-ok (transfer-memo (get token-id item) (get amount item) (get sender item) (get recipient item) (get memo item)) prev-err previous-response))
 
 (define-public (transfer-many-memo (transfers (list 200 {token-id: uint, amount: uint, sender: principal, recipient: principal, memo: (buff 34)})))
-	(fold transfer-many-memo-iter transfers (ok true))
-)
+	(fold transfer-many-memo-iter transfers (ok true)))
 
 ;; distribution-token-trait BEGIN
 ;; Uses Funds Distribution Token model from : https://github.com/ethereum/EIPs/issues/2222
@@ -121,62 +95,69 @@
 
 ;; GETTERS
 (define-read-only (get-points-per-share (token-id uint))
-  (default-to u0 (map-get? points-per-share token-id))
-)
+  (default-to u0 (map-get? points-per-share token-id)))
 
 (define-read-only (get-points-correction (token-id uint) (owner principal))
-  (default-to 0 (map-get? points-correction { token-id: token-id, owner: owner }))
-)
+  (default-to 0 (map-get? points-correction { token-id: token-id, owner: owner })))
 
 (define-read-only (get-withdrawn-funds (token-id uint) (owner principal))
-  (default-to u0 (map-get? withdrawn-funds { token-id: token-id, owner: owner }))
-)
+  (default-to u0 (map-get? withdrawn-funds { token-id: token-id, owner: owner })))
 
 (define-read-only (get-sent-funds (token-id uint) (owner principal))
-  (/ (get-balance-uint token-id owner) DFT_PRECISION)
-)
+  (/ (get-balance-uint token-id owner) DFT_PRECISION))
 
 (define-constant DFT_PRECISION (pow u10 u5))
 
-;; claim withdrawable funds by the token owner
+;; @desc withdraw rewards from caller in selecter pool id
+;; @restricted pool
+;; @param token-id: pool id
+;; @param caller: user withdrawing their rewards
+;; @returns (response uint uint)
 (define-public (withdraw-rewards (token-id uint) (caller principal))
   (let (
-    (withdrawable-funds (withdrawable-funds-of token-id caller))
-  )
+    (withdrawable-funds (withdrawable-funds-of token-id caller)))
     (try! (is-approved-contract contract-caller))
     (map-set withdrawn-funds { token-id: token-id , owner: caller } (+ withdrawable-funds (get-withdrawn-funds token-id caller)))
-    (ok withdrawable-funds)
-  )
-)
+    (ok withdrawable-funds)))
 
-;; called by pool to add rewards acquired
+;; @desc called by pool to add rewards acquired at current block-height
+;; @restricted pool
+;; @param token-id: pool id
+;; @param delta: rewards earned
+;; @returns (response uint uint)
 (define-public (add-rewards (token-id uint) (delta uint))
   (let (
     (total-supply (get-total-supply-uint token-id))
     (valid-token-id (asserts! (> total-supply u0) (ok u0)))
     (added-points (/ (* delta POINTS_MULTIPLIER) total-supply))
-    (total-points-shared (+ (get-points-per-share token-id) added-points))
-  )
+    (total-points-shared (+ (get-points-per-share token-id) added-points)))
     (try! (is-approved-contract contract-caller))
     (map-set points-per-share token-id total-points-shared)
     (print { type: "added_funds", added-points: added-points })
-    (ok total-points-shared)
-  )
-)
+    (ok total-points-shared)))
 
+;; @desc mint tokens that can claim rewards earned
+;; @restricted pool
+;; @param token-id: pool id
+;; @param amount: amount to be minted
+;; @param recipient: recipient of minted tokens
+;; @returns (response true uint)
 (define-public (mint (token-id uint) (amount uint) (recipient principal))
   (begin
     (try! (is-approved-contract contract-caller))
 		(try! (ft-mint? zest-dist amount recipient))
-		;; (try! (tag-nft-token-id {token-id: token-id, owner: recipient}))
 		(set-balance token-id (+ (get-balance-uint token-id recipient) amount) recipient)
 		(map-set token-supplies token-id (+ (unwrap-panic (get-total-supply token-id)) amount))
     (mint-priv token-id amount recipient)
 		(print {type: "sft_mint", token-id: token-id, amount: amount, recipient: recipient})
-		(ok true)
-	)
-)
+		(ok true)))
 
+;; @desc burn tokens that can claim rewards earned
+;; @restricted pool
+;; @param token-id: pool id
+;; @param amount: amount to be minted
+;; @param owner: owner of tokens to be burned
+;; @returns (response true uint)
 (define-public (burn (token-id uint) (amount uint) (owner principal))
   (begin
     (try! (is-approved-contract contract-caller))
@@ -185,33 +166,34 @@
 		(map-set token-supplies token-id (- (unwrap-panic (get-total-supply token-id)) amount))
     (burn-priv token-id amount owner)
 		(print {type: "sft_burn", token-id: token-id, amount: amount, owner: owner})
-    (ok true)
-	)
-)
+    (ok true)))
 
+;; @desc correct for the amount being burned
+;; @restricted pool
+;; @param token-id: pool id
+;; @param amount: amount to be minted
+;; @param owner: owner of tokens to be burned
+;; @returns true
 (define-private (burn-priv (token-id uint) (amount uint) (owner principal))
   (let (
-    (point-correction (to-int (* amount (get-points-per-share token-id))))
-  )
+    (point-correction (to-int (* amount (get-points-per-share token-id)))))
     (map-set points-correction { owner: owner, token-id: token-id }
-      (+ (get-points-correction token-id owner) point-correction)
-    )
-  )
-)
+      (+ (get-points-correction token-id owner) point-correction))))
 
+;; @desc correct for the amount being minted
+;; @restricted pool
+;; @param token-id: pool id
+;; @param amount: amount to be minted
+;; @param owner: owner of tokens to be minted
+;; @returns true
 (define-private (mint-priv (token-id uint) (amount uint) (recipient principal))
   (let (
-    (point-correction (to-int (* amount (get-points-per-share token-id))))
-  )
+    (point-correction (to-int (* amount (get-points-per-share token-id)))))
     (map-set points-correction { owner: recipient, token-id: token-id }
-      (- (get-points-correction token-id recipient) point-correction)
-    )
-  )
-)
+      (- (get-points-correction token-id recipient) point-correction))))
 
 (define-read-only (withdrawable-funds-of (token-id uint) (owner principal))
-  (- (accumulative-funds-of token-id owner) (get-withdrawn-funds token-id owner))
-)
+  (- (accumulative-funds-of token-id owner) (get-withdrawn-funds token-id owner)))
 
 (define-read-only (accumulative-funds-of (token-id uint) (owner principal))
   (begin
@@ -220,36 +202,27 @@
         (to-int (* (get-points-per-share token-id) (get-balance-uint token-id owner)))
         (get-points-correction token-id owner)
       ))
-    POINTS_MULTIPLIER)
-  )
-)
+    POINTS_MULTIPLIER)))
 
 ;; ;; -- ownable-trait --
 (define-public (get-contract-owner)
-  (ok (var-get contract-owner))
-)
+  (ok (var-get contract-owner)))
 
 (define-public (set-contract-owner (owner principal))
   (begin
     (asserts! (is-eq tx-sender (var-get contract-owner)) ERR_UNAUTHORIZED)
-    (ok (var-set contract-owner owner))
-  )
-)
+    (ok (var-set contract-owner owner))))
 
 (define-read-only (is-contract-owner (caller principal))
-  (is-eq caller (var-get contract-owner))
-)
+  (is-eq caller (var-get contract-owner)))
 
 ;; --- approved
-
 (define-map approved-contracts principal bool)
 
 (define-read-only (is-approved-contract (contract principal))
   (if (default-to false (map-get? approved-contracts contract))
     (ok true)
-    ERR_UNAUTHORIZED
-  )
-)
+    ERR_UNAUTHORIZED))
 
 (map-set approved-contracts .staking-pool true)
 

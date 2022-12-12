@@ -17,9 +17,9 @@
 (define-constant DEFAULT 0x03)
 (define-constant IN_OTC_LIQUIDATION 0x04)
 
+;; -- pool
 (define-map cover-pool
-  uint
-  {
+  uint {
     status: (buff 1),
     open: bool,
     capacity: uint,
@@ -33,13 +33,23 @@
     amount-in-otc-liquidation: uint,
     cover-vault: principal })
 
-(define-map sent-funds
-  { owner: principal, token-id: uint }
-  { start: uint, cycles: uint, withdrawal-signaled: uint, amount: uint })
-
-
-(define-map stakers { cover-provider: principal, token-id: uint } bool)
-
+;; @desc creates cover pool
+;; @restricted cover-pool
+;; @param token-id: id of the pool to be created
+;; @param data:
+;;  status: INIT | READY | CLOSED | DEFAULT | IN_OTC_LIQUIDATION,
+;;  open: open to public,
+;;  capacity: maximum amount of cover,
+;;  cycle-length: length of a cycle in blocks,
+;;  min-cycles: minimum commitment cycles,
+;;  available: is the pool active for sending funds,
+;;  cp-token: cover pool token to account for zest rewards,
+;;  cp-rewards-token: cover pool token to account for xbtc rewards,
+;;  pool-start: Stacks block height of first cycle,
+;;  cover-token: asset used as cover,
+;;  amount-in-otc-liquidation: in case of otc liquiditaion, amount that was sent out,
+;;  cover-vault: principal of collateral vault
+;; @returns (response uint uint)
 (define-public (create-pool
   (token-id uint)
   (data {
@@ -54,18 +64,19 @@
     pool-start: uint,
     cover-token: principal,
     amount-in-otc-liquidation: uint,
-    cover-vault: principal
-    })
-  )
+    cover-vault: principal }))
   (begin
     (try! (is-pool-contract))
     (asserts! (map-insert cover-pool token-id data) ERR_POOL_EXISTS)
     
     (print { type: "create-pool", payload: (merge data { token-id: token-id }) })
-    (ok true)
-  )
-)
+    (ok true)))
 
+;; @desc updates pool values
+;; @restricted cover-pool
+;; @param token-id: pool id of the pool being updated
+;; @param data
+;; @returns (response true uint)
 (define-public (set-pool
   (token-id uint)
   (data {
@@ -80,102 +91,103 @@
     pool-start: uint,
     cover-token: principal,
     amount-in-otc-liquidation: uint,
-    cover-vault: principal
-    })
-  )
+    cover-vault: principal }))
   (begin
     (try! (is-pool-contract))
     (map-set cover-pool token-id data)
 
     (print { type: "set-pool", payload: (merge data { token-id: token-id }) })
-    (ok true)
-  )
-)
+    (ok true)))
 
+;; -- sent-funds
+(define-map sent-funds
+  { owner: principal, token-id: uint }
+  { start: uint, cycles: uint, withdrawal-signaled: uint, amount: uint })
+
+;; @desc sets the state of the commitment sent by a user to control for funds sent and withdrawals
+;; @restricted cover-pool
+;; @param owner: user whose commitment is being updated
+;; @param token-id: id of the pool related
+;; @param data:
+;;  start: cycle # at which funds were sent,
+;;  cycles: number of cycles committed,
+;;  withdrawal-signaled: Stacks block height at which withdrawal is signaled,
+;;  amount: amount of funds signaled for withdrawal
+;; @returns (response uint uint)
 (define-public (set-sent-funds
   (owner principal)
   (token-id uint)
-  (data { start: uint, cycles: uint, withdrawal-signaled: uint, amount: uint })
-  )
+  (data { start: uint, cycles: uint, withdrawal-signaled: uint, amount: uint }))
   (begin
     (try! (is-pool-contract))
     (map-set sent-funds { owner: owner, token-id: token-id } data)
 
     (print { type: "set-sent-funds", payload: (merge data { token-id: token-id, owner: owner }) })
-    (ok true)
-  )
-)
+    (ok true)))
 
-(define-read-only (get-sent-funds-read (provider principal) (token-id uint))
-  (unwrap-panic (map-get? sent-funds { owner: provider, token-id: token-id }))
-)
+;; -- stakers
+(define-map stakers { cover-provider: principal, token-id: uint } bool)
 
-(define-public (get-sent-funds (provider principal) (token-id uint))
-  (ok (unwrap! (map-get? sent-funds { owner: provider, token-id: token-id }) ERR_INVALID_PROVIDER))
-)
-
-(define-read-only (get-sent-funds-optional  (provider principal) (token-id uint))
-  (map-get? sent-funds { owner: provider, token-id: token-id })
-)
-
+;; @desc add cover pool provider to the set of allowed providers in case that the pool is closed
+;; @restricted cover-pool
+;; @param cover-provider: principal being added to map
+;; @param token-id: id of the pool related
+;; @returns (response uint uint)
 (define-public (add-staker (staker principal) (token-id uint))
   (begin
 		(try! (is-pool-contract))
     (print { type: "add-staker", payload: { token-id: token-id, staker: staker } })
-		(ok (map-set stakers { cover-provider: staker, token-id: token-id } true))
-	)
-)
+		(ok (map-set stakers { cover-provider: staker, token-id: token-id } true))))
 
+;; @desc remove cover pool provider to the set of allowed providers in case that the pool is closed
+;; @restricted cover-pool
+;; @param cover-provider: principal being added to map
+;; @param token-id: id of the pool related
+;; @returns (response uint uint)
 (define-public (remove-staker (staker principal) (token-id uint))
   (begin
 		(try! (is-pool-contract))
     (print { type: "remove-staker", payload: { token-id: token-id, staker: staker } })
-		(ok (map-set stakers { cover-provider: staker, token-id: token-id } false))
-	)
-)
+		(ok (map-set stakers { cover-provider: staker, token-id: token-id } false))))
+
+(define-read-only (get-sent-funds-read (provider principal) (token-id uint))
+  (unwrap-panic (map-get? sent-funds { owner: provider, token-id: token-id })))
+
+(define-public (get-sent-funds (provider principal) (token-id uint))
+  (ok (unwrap! (map-get? sent-funds { owner: provider, token-id: token-id }) ERR_INVALID_PROVIDER)))
+
+(define-read-only (get-sent-funds-optional  (provider principal) (token-id uint))
+  (map-get? sent-funds { owner: provider, token-id: token-id }))
 
 (define-read-only (is-staker (caller principal) (token-id uint))
-  (default-to false (map-get? stakers { cover-provider: caller, token-id: token-id }))
-)
+  (default-to false (map-get? stakers { cover-provider: caller, token-id: token-id })))
 
 (define-public (is-pool-contract)
-  (if (contract-call? .globals is-cover-pool-contract contract-caller) (ok true) ERR_UNAUTHORIZED)
-)
+  (if (contract-call? .globals is-cover-pool-contract contract-caller) (ok true) ERR_UNAUTHORIZED))
 
 (define-public (get-pool (token-id uint))
-  (ok (unwrap! (map-get? cover-pool token-id) ERR_INVALID_TOKEN_ID))
-)
+  (ok (unwrap! (map-get? cover-pool token-id) ERR_INVALID_TOKEN_ID)))
 
 (define-read-only (get-pool-read (token-id uint))
-  (unwrap-panic (map-get? cover-pool token-id))
-)
+  (unwrap-panic (map-get? cover-pool token-id)))
 
 ;; -- ownable-trait
 (define-data-var contract-owner principal tx-sender)
-;; TO BE .executor-dao
-;; (define-data-var contract-owner principal .executor-dao)
 
 (define-read-only (get-contract-owner)
-  (ok (var-get contract-owner))
-)
+  (ok (var-get contract-owner)))
 
 (define-public (set-contract-owner (owner principal))
   (begin
     (asserts! (is-eq tx-sender (var-get contract-owner)) ERR_UNAUTHORIZED)
     (print { type: "set-contract-owner-cover-pool-data", payload: owner })
-    (ok (var-set contract-owner owner))
-  )
-)
+    (ok (var-set contract-owner owner))))
 
 (define-read-only (is-contract-owner (caller principal))
-  (is-eq caller (var-get contract-owner))
-)
-
+  (is-eq caller (var-get contract-owner)))
 
 ;; ERROR START 21000
 (define-constant ERR_UNAUTHORIZED (err u21000))
 (define-constant ERR_POOL_EXISTS (err u21001))
 (define-constant ERR_INVALID_TOKEN_ID (err u21002))
 (define-constant ERR_INVALID_PROVIDER (err u21003))
-
-;; (define-constant ERR_INVALID_POOL (err u21001))

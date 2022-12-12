@@ -9,26 +9,20 @@
 
 ;; ;; -- ownable-trait --
 (define-public (get-contract-owner)
-  (ok (var-get contract-owner))
-)
+  (ok (var-get contract-owner)))
 
 (define-read-only (is-contract-owner (caller principal))
-  (is-eq caller (var-get contract-owner))
-)
+  (is-eq caller (var-get contract-owner)))
 
 (define-public (set-contract-owner (owner principal))
   (begin
     (asserts! (is-eq tx-sender (var-get contract-owner)) ERR_UNAUTHORIZED)
-    (ok (var-set contract-owner owner))
-  )
-)
+    (ok (var-set contract-owner owner))))
 
 (define-public (transfer (amount uint) (recipient principal) (ft <ft>))
   (begin
-    (asserts! (is-contract-owner contract-caller) ERR_UNAUTHORIZED)
-    (as-contract (contract-call? ft transfer amount tx-sender recipient none))
-  )
-)
+    (asserts! (is-contract-owner tx-sender) ERR_UNAUTHORIZED)
+    (as-contract (contract-call? ft transfer amount tx-sender recipient none))))
 
 (define-read-only (is-approved-contract (contract principal))
   (if (or
@@ -36,9 +30,7 @@
     (contract-call? .globals is-loan-contract contract)
     (contract-call? .globals is-cover-pool-contract contract))
     (ok true)
-    ERR_UNAUTHORIZED
-  )
-)
+    ERR_UNAUTHORIZED))
 
 ;; ERROR START 17000
 
