@@ -281,7 +281,7 @@
 
     (if (get available cover-pool) (try! (contract-call? cp-token add-rewards token-id cover-portion)) u0)
 
-    (try! (contract-call? .read-data add-cover-pool-zest-rewards-earned token-id (+ cover-portion)))
+    (try! (contract-call? .read-data add-cover-pool-zest-rewards-earned token-id cover-portion))
     (ok true)))
 
 ;; -- token-id -> late-fee
