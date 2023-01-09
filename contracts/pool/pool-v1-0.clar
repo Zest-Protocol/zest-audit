@@ -317,6 +317,11 @@
     (print { event: "finalize-pool", pool: new-pool })
     (ok true)))
 
+(define-read-only (is-ready (token-id uint))
+  (let (
+    (pool (get-pool-read token-id)))
+    (is-eq (get status pool) READY)))
+
 ;; @desc send the funds to the pool. if already sent funds, claim zest rewards and set
 ;; cycle of commitments based on previous commitment and new. 
 ;; @restricted supplier
@@ -596,6 +601,7 @@
     (new-pool (merge pool { principal-out: (- (get principal-out pool) returned-funds) } )))
     (asserts! (contract-call? .globals is-xbtc (contract-of xbtc)) ERR_INVALID_XBTC)
     (asserts! (is-eq token-id loan-pool-id) ERR_INVALID_LOAN_POOL_ID)
+    (try! (caller-is (get pool-delegate pool)))
 
     (try! (contract-call? .read-data loans-funded-minus))
 
@@ -893,6 +899,7 @@
   (loan-id uint)
   (lp-token <lp-token>)
   (token-id uint)
+  (lv <lv>)
   (amount uint)
   (xbtc <ft>)
   (caller principal))
@@ -905,7 +912,7 @@
     (asserts! (contract-call? .globals is-xbtc (contract-of xbtc)) ERR_INVALID_XBTC)
     (asserts! (is-eq loan-pool-id token-id) ERR_INVALID_TOKEN_ID)
 
-    (try! (contract-call? xbtc transfer amount caller liquidity-vault none))
+    (try! (contract-call? lv add-asset xbtc amount token-id caller))
     (contract-call? .loan-v1-0 make-residual-payment loan-id lp-token token-id amount xbtc)))
 
 ;; @desc Test the drawdown process by requesting a set amount of funds
