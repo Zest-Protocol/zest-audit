@@ -360,6 +360,7 @@
   (preimage (buff 128))
   (loan-id uint)
   (lp-token <lp-token>)
+  (lv <lv>)
   (token-id uint)
   (xbtc-ft <ft>))
   (let (
@@ -370,7 +371,7 @@
     (height (unwrap! (map-get? escrowed-tx txid) ERR_TX_DOES_NOT_EXIST))
     (swapper (get swapper-principal swap)))
     (map-delete escrowed-tx txid)
-    (ok (try! (contract-call? .pool-v1-0 make-residual-payment loan-id lp-token token-id (get sats swap) xbtc-ft tx-sender)))))
+    (ok (try! (contract-call? .pool-v1-0 make-residual-payment loan-id lp-token token-id lv (get sats swap) xbtc-ft tx-sender)))))
 
 ;; @desc In case of leaked preimage, user can still complete the make-residual-payment process without
 ;; having to enable the contingency plan
@@ -705,7 +706,7 @@
   (let (
     (pool (try! (contract-call? .pool-v1-0 get-pool token-id)))
     (xbtc (try! (contract-call? .pool-v1-0 drawdown-verify loan-id lp-token token-id coll-token coll-vault fv swap-router xbtc-ft tx-sender)))
-    (swap-id (try! (as-contract (contract-call? .magic-protocol initiate-outbound-swap xbtc btc-version btc-hash supplier-id))))
+    (swap-id (try! (as-contract (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge initiate-outbound-swap xbtc btc-version btc-hash supplier-id))))
     (liquidity (try! (get-current-liquidity))))
     (asserts! (contract-call? .globals is-onboarded-address-read tx-sender btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED)
     (asserts! (>= liquidity xbtc) ERR_NOT_ENOUGH_LIQUIDITY)
@@ -978,13 +979,13 @@
 
 (define-private (finalize-completed (txid (buff 32)) (xbtc-ft <ft>))
   (let (
-    (swap (try! (contract-call? .magic-protocol get-full-inbound txid)))
+    (swap (try! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge get-full-inbound txid)))
     (swapper (get swapper-principal swap))
     (sats (get sats swap))
     (xbtc (get xbtc swap))
     (fee (- sats xbtc))
     (updated-funds (try! (withdraw-protocol fee))))
-    (unwrap! (contract-call? .magic-protocol get-preimage txid) ERR_TX_DOES_NOT_EXIST)
+    (unwrap! (contract-call? 'SP1WN90HKT0E1FWCJT9JFPMC8YP7XGBGFNZGHRVZX.bridge get-preimage txid) ERR_TX_DOES_NOT_EXIST)
     (asserts! (is-eq tx-sender swapper) ERR_WRONG_SWAPPER)
     (try! (as-contract (contract-call? xbtc-ft transfer fee tx-sender swapper none)))
     (ok (merge swap { fee: fee }))))
