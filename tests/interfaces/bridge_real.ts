@@ -17,7 +17,7 @@ class Bridge {
       caller: string,
       ) {
       return Tx.contractCall(
-        "bridge",
+        "magic-protocol",
         'escrow-swap',
         [
           types.tuple({
@@ -53,7 +53,7 @@ class Bridge {
       caller: string
     ) {
       return Tx.contractCall(
-        "bridge",
+        "magic-protocol",
         'register-supplier',
         [
           types.buff(Buffer.from(publicKey, "hex")),
@@ -71,7 +71,7 @@ class Bridge {
       caller: string
     ) {
       return Tx.contractCall(
-          "bridge",
+          "magic-protocol",
           'initialize-swapper',
           [],
           caller
@@ -84,7 +84,7 @@ class Bridge {
       caller: string
     ) {
       return Tx.contractCall(
-          "bridge",
+          "magic-protocol",
           'finalize-swap',
           [
             types.buff(Buffer.from(txid,"hex")),
@@ -99,7 +99,11 @@ class Bridge {
     }
 
     static getSupplier(chain:Chain, supplierId: number, caller: string) {
-      return chain.callReadOnlyFn(`bridge`, "get-supplier", [ types.uint(supplierId) ], caller).result;
+      return chain.callReadOnlyFn(`magic-protocol`, "get-supplier", [ types.uint(supplierId) ], caller).result;
+    }
+
+    static getSwapper(chain:Chain, swapperId: number, caller: string) {
+      return chain.callReadOnlyFn(`magic-protocol`, "get-swapper-principal", [ types.uint(swapperId) ], caller).result;
     }
 
 }

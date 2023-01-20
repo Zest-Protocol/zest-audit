@@ -163,7 +163,7 @@ Clarinet.test({
 
     assetMaps = chain.getAssetsMaps();
     
-    assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"], 9999700000);
+    assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"], 9999700000);
 
     chain.mineEmptyBlock(10);
 
@@ -179,8 +179,6 @@ Clarinet.test({
     assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.protocol-treasury"], treasuryFee);
   },
 });
-
-
 
 Clarinet.test({
   name: "Pool Delegate can unwind a funded loan",

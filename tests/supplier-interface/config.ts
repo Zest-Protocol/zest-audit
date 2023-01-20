@@ -24,9 +24,12 @@ export const USDA_CONTRACT = `SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-tok
 export const USDA_CONTRACT_SIMNET = `ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usda-token`;
 export const XUSD_CONTRACT_SIMNET = `ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.Wrapped-USD`;
 export const COVER_VAULT = `${DEPLOYER}.cover-vault`;
+export const SAFE = `${DEPLOYER}.safe`;
 
 // export const ONE_DAY = 36;
 export const ONE_DAY = 144;
+export const DAYS_PER_YEAR = 365;
+export const DAYS_PER_WEEK = 7;
 export const CYCLE_LENGTH = ONE_DAY * 2 * 7;
 export const PASSIVE_BPS = 100;
 export const PASSIVE_DIVIDER = 10_000;

@@ -128,11 +128,11 @@ Clarinet.test({
       ...makePaymentTxs(deployerWallet.address, wallet_8.address,sender,recipient,500,1,regularPaymentDue,"01",0,minPaymentToReceive,0, PAYMENT, LP_TOKEN,LIQUIDITY_VAULT, 0, CP_TOKEN, CP_REWARDS_TOKEN, ZP_TOKEN, SWAP_ROUTER,chain.blockHeight - 1, XBTC)
     ]);
 
-    let fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`];
+    let fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`];
     // block = coverPool.withdrawRewards(CP_REWARDS_TOKEN, 0, LIQUIDITY_VAULT, XBTC, cover.address);
     block = chain.mineBlock([SupplierInterface.withdrawCoverRewards(P2PKH_VERSION, HASH, 0, CP_REWARDS_TOKEN, 0, LIQUIDITY_VAULT, XBTC, cover.address)]);
 
-    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`])
+    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`])
     
     block = coverPool.withdrawZestRewards(CP_TOKEN, 0, REWARDS_CALC, cover.address);
 
@@ -181,7 +181,7 @@ Clarinet.test({
       ...sendFundsP2SHTxs(deployerWallet.address,0,LP_2.address,sender,recipient,500,1,100_000_000,preimage,0,100_000_000 * fee / 10_000,1,5),
     ]);
 
-    let fundsOnBridge = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`];
+    let fundsOnBridge = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`];
 
     block = pool.createLoan(LP_TOKEN,0,100_000_000,XBTC,0,XBTC,300,12960,1440,COLL_VAULT,FUNDING_VAULT,wallet_8.address);
     
@@ -215,26 +215,26 @@ Clarinet.test({
     block = coverPool.withdrawZestRewards(CP_TOKEN, 0, REWARDS_CALC, cover_1.address);
     block = coverPool.withdrawZestRewards(CP_TOKEN, 0, REWARDS_CALC, cover_2.address);
 
-    let fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`];
+    let fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`];
 
     block = chain.mineBlock([SupplierInterface.withdrawCoverRewards(P2PKH_VERSION, HASH, 0, CP_REWARDS_TOKEN, 0, LIQUIDITY_VAULT, XBTC, cover_1.address)]);
-    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`])
-    fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`];
+    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`])
+    fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`];
 
     block = chain.mineBlock([SupplierInterface.withdrawCoverRewards(P2PKH_VERSION, HASH, 0, CP_REWARDS_TOKEN, 0, LIQUIDITY_VAULT, XBTC, cover_2.address)]);
-    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`])
+    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`])
 
     
-    fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`];
+    fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`];
     block = chain.mineBlock([SupplierInterface.withdrawRewards(P2PKH_VERSION, HASH, 0, LP_TOKEN, 0, LIQUIDITY_VAULT, XBTC, LP_1.address)]);
-    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`])
+    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`])
 
-    fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`];
+    fundsOnBridge_CP = chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`];
     block = chain.mineBlock([SupplierInterface.withdrawRewards(P2PKH_VERSION, HASH, 0, LP_TOKEN, 0, LIQUIDITY_VAULT, XBTC, LP_2.address)]);
-    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`])
+    assert(fundsOnBridge_CP < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`])
 
 
-    assert(fundsOnBridge < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.bridge`]);
+    assert(fundsOnBridge < chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][`${deployerWallet.address}.magic-protocol`]);
 
     assert(chain.getAssetsMaps().assets[".zge000-governance-token.zest"][cover_1.address] > 2_100_000_000_000_000n);
     assert(chain.getAssetsMaps().assets[".zge000-governance-token.zest"][cover_2.address] > 0n);
