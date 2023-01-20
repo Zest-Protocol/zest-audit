@@ -398,7 +398,7 @@ Clarinet.test({
 
     block = chain.mineBlock([
       Bridge.initializeSwapper(wallet_8.address),
-      ...makeResidualPayment(deployerWallet.address, wallet_8.address,sender,recipient,500,1,RESIDUAL,"01",0,minPaymentToReceive,0,LP_TOKEN,0,chain.blockHeight - 1, XBTC)
+      ...makeResidualPayment(deployerWallet.address, wallet_8.address,sender,recipient,500,1,RESIDUAL,"01",0,minPaymentToReceive,0,LP_TOKEN,LIQUIDITY_VAULT,0,chain.blockHeight - 1, XBTC)
     ])
     assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.liquidity-vault-v1-0"], RESIDUAL);
     rolloverData = (loan.getRolloverData(0).result.expectTuple());

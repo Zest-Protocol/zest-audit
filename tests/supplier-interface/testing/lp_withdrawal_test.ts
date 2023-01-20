@@ -102,7 +102,7 @@ Clarinet.test({
     ]);
 
     assetMaps = chain.getAssetsMaps();
-    assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"], 10000000000);
+    assertEquals(assetMaps.assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"], 10000000000);
   },
 });
 
@@ -216,12 +216,12 @@ Clarinet.test({
 
     block = pool.withdrawZestRewards(0,ZP_TOKEN, REWARDS_CALC, wallet_1.address);
 
-    let before = (chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"]);
+    let before = (chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"]);
     block = chain.mineBlock([SupplierInterface.withdrawRewards(P2PKH_VERSION, HASH, 0, LP_TOKEN, 0, LIQUIDITY_VAULT, XBTC, wallet_1.address)]);
     let result = chain.callReadOnlyFn("lp-token", "withdrawable-funds-of", [ types.uint(0), types.principal(wallet_1.address) ], deployerWallet.address);
     
     let difference = (consumeUint(String(block.receipts[0].result.expectOk())));
-    let after = (chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bridge"]);
+    let after = (chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"]["ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.magic-protocol"]);
     
     assertEquals(after - before, difference);
   },

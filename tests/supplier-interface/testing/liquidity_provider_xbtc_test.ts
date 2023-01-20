@@ -107,7 +107,7 @@ Clarinet.test({
     block = chain.mineBlock([SupplierInterface.withdrawXBTC(100_000_000,LP_TOKEN,ZP_TOKEN,0,LIQUIDITY_VAULT,XBTC,LP_1.address)]);
     block.receipts[0].result.expectOk();
     
-    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][LP_1.address], 10_000_000_000);
+    assertEquals(chain.getAssetsMaps().assets[".Wrapped-Bitcoin.wrapped-bitcoin"][LP_1.address], 100_000_000_000_000);
   },
 });
 

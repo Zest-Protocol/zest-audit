@@ -233,6 +233,7 @@ class SupplierInterface {
     preimage: string,
     loanId: number,
     lpToken: string,
+    lv: string,
     tokenId: number,
     xbtc: string,
     caller: string
@@ -245,6 +246,7 @@ class SupplierInterface {
         types.buff(Buffer.from(preimage,"hex")),
         types.uint(loanId),
         types.principal(lpToken),
+        types.principal(lv),
         types.uint(tokenId),
         types.principal(xbtc),
       ],

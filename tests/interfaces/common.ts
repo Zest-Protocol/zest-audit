@@ -390,6 +390,7 @@ function makeResidualPayment(
   loanId: number,
   // payment: string,
   lpToken: string,
+  lv: string,
   tokenId: number,
   // cpToken: string,
   // cpRewards: string,
@@ -427,6 +428,7 @@ function makeResidualPayment(
       preimage,
       loanId,
       lpToken,
+      lv,
       tokenId,
       xbtc,
       stxSender
