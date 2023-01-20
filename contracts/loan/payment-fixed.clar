@@ -123,7 +123,7 @@
     ;; P * r * t => Amount * perc_rate * blocks
     ;; amount * delta * (APR / blocks_per_year)
     (payment (get-payment token-id amount (get payment-period loan) apr height (get next-payment loan) caller))
-    (early-payment (+ payment (get-prc payment (var-get early-repayment-fee))))
+    (early-payment (+ payment (get-prc payment (get-early-repayment-fee token-id))))
     (xbtc-staker-portion (get-prc early-payment (get cover-fee pool)))
     (xbtc-delegate-portion (get-prc early-payment (get delegate-fee pool)))
     (xbtc-lp-portion (- early-payment xbtc-staker-portion xbtc-delegate-portion))
@@ -171,7 +171,7 @@
   (let (
     (payment (/ (/ (* amount payment-period apr PRECISION) BLOCKS_PER_YEAR) PRECISION DEN)))
     (if (and (is-paying-late-fees caller) (> height next-payment))
-      (+ payment (/ (* payment (var-get late-fee)) DEN))
+      (+ payment (/ (* payment (get-late-fee token-id)) DEN))
       payment)))
 
 (define-read-only (get-payment-at-height (loan-id uint) (height uint) (caller principal))
@@ -179,7 +179,7 @@
     (loan (contract-call? .loan-v1-0 get-loan-read loan-id))
     (token-id (contract-call? .pool-v1-0 get-loan-pool-id-read loan-id))
     (pool (contract-call? .pool-v1-0 get-pool-read token-id))
-    (payment (get-payment (get loan-amount loan) (get payment-period loan) (get apr loan) height (get next-payment loan) caller)))
+    (payment (get-payment token-id (get loan-amount loan) (get payment-period loan) (get apr loan) height (get next-payment loan) caller)))
     payment))
 
 (define-read-only (get-current-loan-payment (loan-id uint) (caller principal))
@@ -187,7 +187,7 @@
     (loan (contract-call? .loan-v1-0 get-loan-read loan-id))
     (token-id (contract-call? .pool-v1-0 get-loan-pool-id-read loan-id))
     (pool (contract-call? .pool-v1-0 get-pool-read token-id))
-    (payment (get-payment (get loan-amount loan) (get payment-period loan) (get apr loan) burn-block-height (get next-payment loan) caller)))
+    (payment (get-payment token-id (get loan-amount loan) (get payment-period loan) (get apr loan) burn-block-height (get next-payment loan) caller)))
     payment))
 
 (define-read-only (get-early-repayment-amount (loan-id uint) (caller principal))
@@ -195,8 +195,8 @@
     (loan (contract-call? .loan-v1-0 get-loan-read loan-id))
     (token-id (contract-call? .pool-v1-0 get-loan-pool-id-read loan-id))
     (pool (contract-call? .pool-v1-0 get-pool-read token-id))
-    (payment (get-payment (get loan-amount loan) (get payment-period loan) (get apr loan) burn-block-height (get next-payment loan) caller))
-    (early-repayment (get-prc payment (var-get early-repayment-fee))))
+    (payment (get-payment token-id (get loan-amount loan) (get payment-period loan) (get apr loan) burn-block-height (get next-payment loan) caller))
+    (early-repayment (get-prc payment (get-early-repayment-fee token-id))))
     (+ payment early-repayment (get loan-amount loan))))
 
 (define-read-only (get-prc (amount uint) (bp uint))
@@ -281,7 +281,7 @@
 
     (if (get available cover-pool) (try! (contract-call? cp-token add-rewards token-id cover-portion)) u0)
 
-    (try! (contract-call? .read-data add-cover-pool-zest-rewards-earned token-id (+ cover-portion)))
+    (try! (contract-call? .read-data add-cover-pool-zest-rewards-earned token-id cover-portion))
     (ok true)))
 
 ;; -- token-id -> late-fee
@@ -290,28 +290,28 @@
 ;; @desc set late fee
 ;; @param fee: new late fee in BP
 ;; @returns (response true uint)
-(define-public (set-late-fee (fee uint))
+(define-public (set-late-fee (token-id uint) (fee uint))
   (begin
     (asserts! (is-contract-owner tx-sender) ERR_UNAUTHORIZED)
     (asserts! (not (contract-call? .pool-v1-0 is-ready token-id)) ERR_PARAM_LOCKED)
     (print { type: "set-late-fee-payment-fixed", payload: { token-id: token-id, fee: fee } })
-    (ok (var-set late-fee fee))))
+    (ok (map-set late-fee token-id fee))))
 
 (define-read-only (get-late-fee (token-id uint))
   (default-to u10 (map-get? late-fee token-id)))
 
 ;; -- token-id -> early-repayment-fee
-(define-data-var early-repayment-fee uint u10) ;; fee in Basis Points
+(define-map early-repayment-fee uint uint)
 
 ;; @desc set early repayment fee
 ;; @param fee: new early repayment fee in BP
 ;; @returns (response true uint)
-(define-public (set-early-repayment-fee (fee uint))
+(define-public (set-early-repayment-fee (token-id uint) (fee uint))
   (begin
     (asserts! (is-contract-owner tx-sender) ERR_UNAUTHORIZED)
     (asserts! (not (contract-call? .pool-v1-0 is-ready token-id)) ERR_PARAM_LOCKED)
     (print { type: "set-early-repayment-fee-payment-fixed", payload: { token-id: token-id, early-repayment-fee: fee } })
-    (ok (var-set early-repayment-fee fee))))
+    (ok (map-set early-repayment-fee token-id fee))))
 
 (define-read-only (get-early-repayment-fee (token-id uint))
   (default-to u10 (map-get? early-repayment-fee token-id)))
