@@ -8,7 +8,7 @@
     (try!  (contract-call?
       .pool-v1-0 fund-loan
       (unwrap! param-u (err u9999))
-      .lp-token
+      .lp-token-0
       u0
       .liquidity-vault-v1-0
       .funding-vault

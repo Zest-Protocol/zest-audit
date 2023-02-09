@@ -90,6 +90,9 @@ path = "contracts/loan/loan-v1-0.clar"
 path = "contracts/token/lp-token.clar"
 depends_on = ["executor-dao"]
 
+[contracts.lp-token-0]
+path = "contracts/token/lp-token-0.clar"
+
 [contracts.lp-token-trait]
 path = "contracts/trait/lp-token-trait.clar"
 
@@ -134,6 +137,9 @@ path = "contracts/trait/ft-trait.clar"
 
 [contracts.xZest-token]
 path = "contracts/token/xZest-token.clar"
+
+[contracts.sip-010-trait]
+path = "contracts/trait/sip-010-trait.clar"
 
 [contracts.staking-pool]
 path = "contracts/pool/staking-pool.clar"
@@ -188,6 +194,11 @@ path = "contracts/multisafe/executors/transfer-sip-010.clar"
 
 [contracts.vault-trait]
 path = "contracts/trait/vault-trait.clar"
+
+[contracts.withdrawal-manager]
+path = 'contracts/pool/withdrawal-manager.clar'
+clarity_version = 1
+epoch = 2.0
 
 [contracts.Wrapped-Bitcoin]
 path = "contracts/token/Wrapped-Bitcoin-simnet.clar"

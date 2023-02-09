@@ -3,6 +3,7 @@
 (use-trait lp-token .lp-token-trait.lp-token-trait)
 (use-trait cp-token .distribution-token-cycles-losses-trait.distribution-token-cycles-losses-trait)
 (use-trait ft .ft-trait.ft-trait)
+(use-trait sip-010 .sip-010-trait.sip-010-trait)
 (use-trait dt .distribution-token-trait.distribution-token-trait)
 (use-trait lv .liquidity-vault-trait.liquidity-vault-trait)
 (use-trait v .vault-trait.vault-trait)
@@ -19,6 +20,7 @@
 (define-constant MATURED 0x05)
 (define-constant LIQUIDATED 0x06)
 (define-constant EXPIRED 0x07)
+(define-constant IMPAIRED 0x08)
 
 (define-constant ONE_DAY (contract-call? .globals get-day-length-default))
 (define-constant BP_PRC u10000)
@@ -76,12 +78,12 @@
       coll-vault: coll-vault,
       funding-vault: funding-vault,
       created: burn-block-height,
-      asset: asset-contract }))
+      asset: asset-contract
+      }))
     (try! (caller-is-pool))
     (try! (can-borrow borrower))
     (asserts! (contract-call? .globals is-coll-vault coll-vault) ERR_INVALID_CV)
     (asserts! (contract-call? .globals is-coll-contract (contract-of coll-token)) ERR_INVALID_COLL)
-
     (asserts! (> payment-period u0) ERR_INVALID_TIME)
     (asserts! (is-eq u0 (mod maturity-length payment-period)) ERR_INVALID_TIME)
     (asserts! (> loan-amount u0) ERR_INVALID_LOAN_AMT)
@@ -134,7 +136,7 @@
 ;; @param lv-contract: liquidity vault to which funds are being returned
 ;; @param xbtc: SIP-010 xbtc token
 ;; @returns loan amount
-(define-public (unwind (loan-id uint) (fv <v>) (lv-contract principal) (xbtc <ft>))
+(define-public (unwind (token-id uint) (loan-id uint) (fv <fv>) (lv <lv>) (xbtc <ft>))
   (let (
     (loan (try! (get-loan loan-id)))
     (globals (contract-call? .globals get-globals))
@@ -151,7 +153,8 @@
     (asserts! (> (- burn-block-height (get created loan)) (get funding-period globals)) ERR_FUNDING_IN_PROGRESS)
     
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
-    (try! (contract-call? fv transfer loan-amount lv-contract xbtc))
+    (try! (contract-call? fv remove-asset xbtc loan-amount loan-id (as-contract tx-sender)))
+    (try! (as-contract (contract-call? lv add-asset xbtc loan-amount token-id tx-sender)))
 
     (ok (get loan-amount loan))))
 
@@ -163,7 +166,7 @@
   (coll-token <ft>)
   (coll-vault <cv>)
   (fv <fv>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (pool-delegate principal)
   (delegate-fee uint)
@@ -210,9 +213,9 @@
   (loan-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (lv-principal principal)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (pool-delegate principal)
   (delegate-fee uint)
@@ -230,7 +233,8 @@
     (investor-portion (get-bp loan-amount (get investor-fee globals)))
     (delegate-portion (get-bp investor-portion delegate-fee))
     (lp-portion (- investor-portion delegate-portion))
-    (borrow-amount (- loan-amount treasury-portion))
+    (tested-amount (get-tested-amount loan-id))
+    (borrow-amount (- loan-amount treasury-portion tested-amount))
     (new-loan (merge loan { status: AWAITING_DRAWDOWN })))
     (try! (caller-is-pool))
     (asserts! (is-eq (get borrower loan) sender) ERR_UNAUTHORIZED)
@@ -249,8 +253,10 @@
         true)
       false)
 
+    ;; reset value
+
     ;; for Magic Protocol
-    (try! (contract-call? fv transfer borrow-amount (get supplier-interface globals) xbtc))
+    (try! (contract-call? fv remove-asset xbtc borrow-amount loan-id (get supplier-interface globals)))
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
 
     (ok borrow-amount)))
@@ -273,9 +279,9 @@
   (loan-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (lv-principal principal)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (pool-delegate principal)
   (delegate-fee uint)
@@ -291,7 +297,8 @@
     (investor-portion (get-bp loan-amount (get investor-fee globals)))
     (delegate-portion (get-bp investor-portion delegate-fee))
     (lp-portion (- investor-portion delegate-portion))
-    (borrow-amount (- loan-amount treasury-portion investor-portion))
+    (tested-amount (get-tested-amount loan-id))
+    (borrow-amount (- loan-amount treasury-portion tested-amount))
     (new-loan (merge loan { status: ACTIVE, next-payment: (+ burn-block-height (get payment-period loan)) })))
     (try! (caller-is-pool))
     (asserts! (is-eq (get status loan) AWAITING_DRAWDOWN) ERR_INVALID_STATUS)
@@ -299,13 +306,13 @@
     (asserts! (is-eq (get funding-vault loan) (contract-of fv)) ERR_INVALID_FV)
     (asserts! (is-eq (get coll-vault loan) (contract-of coll-vault)) ERR_INVALID_CV)
     
-    (try! (contract-call? fv transfer treasury-portion (get treasury globals) xbtc))
+    (try! (contract-call? fv remove-asset xbtc treasury-portion loan-id (get treasury globals)))
     
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
 
-    (try! (contract-call? .read-data active-loans-plus))
-    (try! (contract-call? .read-data add-active-loan-amount token-id borrow-amount))
-    (try! (contract-call? .read-data add-delegate-btc-rewards-earned pool-delegate delegate-portion))
+    (set-tested-amount loan-id u0)
+    
+    (print { type: "finalize-loan-drawdown", payload: { key: { loan-id: loan-id, token-id: token-id }, data: new-loan } })
 
     (ok { borrower: (get borrower loan), borrow-amount:  borrow-amount })))
 
@@ -328,7 +335,7 @@
   (coll-vault <cv>)
   (fv <fv>)
   (lv-principal principal)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (pool-delegate principal)
   (delegate-fee uint)
@@ -344,7 +351,8 @@
     (investor-portion (get-bp loan-amount (get investor-fee globals)))
     (delegate-portion (get-bp investor-portion delegate-fee))
     (lp-portion (- investor-portion delegate-portion))
-    (borrow-amount (- loan-amount treasury-portion))
+    (tested-amount (get-tested-amount loan-id))
+    (borrow-amount (- loan-amount treasury-portion tested-amount))
     (new-loan (merge loan { status: FUNDED })))
     (try! (caller-is-pool))
     (asserts! (is-eq (get status loan) AWAITING_DRAWDOWN) ERR_INVALID_STATUS)
@@ -358,7 +366,7 @@
         (try! (contract-call? coll-vault draw coll-token loan-id tx-sender))
         true)
       false)
-
+    
     (try! (as-contract (contract-call? fv add-asset xbtc borrow-amount loan-id tx-sender)))
 
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
@@ -368,7 +376,7 @@
   (loan-id uint)
   (height uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -377,11 +385,13 @@
   (swap-router <swap>)
   (amount uint)
   (xbtc <ft>)
-  (caller principal))
+  (caller principal)
+  )
   (let (
     (done (try! (contract-call? xbtc transfer amount caller (as-contract tx-sender) none)))
     (loan (try! (get-loan loan-id)))
-    (total-tested-amount (+ amount (get-tested-amount loan-id))))
+    (total-tested-amount (+ amount (get-tested-amount loan-id)))
+  )
     (try! (is-supplier-interface))
     (asserts! (is-eq caller (get borrower loan)) ERR_UNAUTHORIZED)
     (asserts! (is-eq ACTIVE (get status loan)) ERR_INVALID_STATUS)
@@ -392,10 +402,10 @@
     ;; for payment testing
     (set-tested-amount loan-id total-tested-amount)
 
-    (try! (contract-call? .read-data remove-active-loan-amount token-id amount))
     (ok total-tested-amount)))
 
-;; @desc funds are received from the supplier interface sent to the payment contract
+;; @desc funds are received from the supplier interface sent to the payment contract. If loan
+;; is impaired, set back to active.
 ;; @restricted bridge
 ;; @param loan-id: id of loan being paid for
 ;; @param height: height of the Bitcoin tx
@@ -415,7 +425,7 @@
   (loan-id uint)
   (height uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -435,25 +445,28 @@
           true)))
     (loan (try! (get-loan loan-id)))
     (payment-response (try! (contract-call? payment make-next-payment lp-token lv token-id cp-token cp-rewards-token zd-token swap-router height loan-id (+ tested-amount amount) xbtc caller)))
-    (amount-due (- (get reward payment-response) tested-amount)))
+    (amount-due (- (get reward payment-response) tested-amount))
+  )
     (try! (is-supplier-interface))
     (asserts! (is-eq caller (get borrower loan)) ERR_UNAUTHORIZED)
     (asserts! (is-eq ACTIVE (get status loan)) ERR_INVALID_STATUS)
-    (asserts! (>= amount (get reward payment-response)) ERR_NOT_ENOUGH_PAID)
+    (asserts! (>= amount amount-due) ERR_NOT_ENOUGH_PAID)
     ;; if repayment, assert amount being sent is greater than the total loan
     (let (
       (remaining-payments (get remaining-payments loan))
       (new-loan
         (if (is-eq remaining-payments u1)
           (begin
-            (try! (contract-call? .read-data active-loans-minus))
-            (merge loan { next-payment: u0, remaining-payments: u0, status: MATURED}))
-          (merge loan { remaining-payments: (- remaining-payments u1), next-payment: (+ (get next-payment loan) (get payment-period loan)) })
+            (merge loan { next-payment: u0, remaining-payments: u0, status: MATURED }))
+          (merge loan
+            {
+              remaining-payments: (- remaining-payments u1),
+              next-payment: (+ (get next-payment loan) (get payment-period loan)),
+              status: ACTIVE })
         )))
       (try! (contract-call? .loan-data set-loan loan-id new-loan)))
 
-    (try! (contract-call? .read-data remove-active-loan-amount token-id amount))
-
+    (print { type: "make-payment", payload: { key: { loan-id: loan-id, token-id: token-id }, data: loan, amount: amount } })
     ;; for payment testing
     (set-tested-amount loan-id u0)
 
@@ -479,7 +492,7 @@
   (loan-id uint)
   (height uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>) 
@@ -504,15 +517,13 @@
     (try! (is-supplier-interface))
     (asserts! (is-eq caller (get borrower loan)) ERR_UNAUTHORIZED)
     (asserts! (is-eq ACTIVE (get status loan)) ERR_INVALID_STATUS)
-    (asserts! (>= amount (+ (get reward payment-response) (get full-payment payment-response))) ERR_NOT_ENOUGH_PAID)
+    (asserts! (>= amount amount-due) ERR_NOT_ENOUGH_PAID)
 
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
 
-    (try! (contract-call? .read-data active-loans-minus))
-    (try! (contract-call? .read-data remove-active-loan-amount token-id amount))
-
     (set-tested-amount loan-id u0)
 
+    (print { type: "make-repayment", payload: { key: { loan-id: loan-id, token-id: token-id }, data: loan, amount: amount } })
     (ok payment-response)))
 
 ;; @desc Pool Delegate liquidates loans that have their grace period expired.
@@ -536,12 +547,16 @@
     (withdrawn-funds (if has-collateral (try! (withdraw-collateral coll-vault coll-token loan-id recipient)) u0))
     (xbtc-to-recover (if has-collateral (try! (contract-call? swap-router get-y-given-x coll-token xbtc withdrawn-funds)) u0))
     (min-xbtc-to-recover (/ (* xbtc-to-recover max-slippage) BP_PRC))
+    (status (get status loan))
     (recovered-funds (if has-collateral (try! (contract-call? swap-router swap-x-for-y recipient coll-token xbtc withdrawn-funds (some min-xbtc-to-recover))) u0)))
     (try! (caller-is-pool))
-    (asserts! (is-eq (get status loan) ACTIVE) ERR_INVALID_STATUS)
+    (asserts! (or
+      (and (is-eq status ACTIVE)
+        (> burn-block-height (+ (get grace-period globals) (get next-payment loan))))
+      (is-eq status IMPAIRED)
+      ) ERR_LOAN_IN_PROGRESS)
     (asserts! (is-eq (contract-of coll-vault) (get coll-vault loan)) ERR_INVALID_CV)
     (asserts! (is-eq (contract-of coll-token) (get coll-token loan)) ERR_INVALID_COLL)
-    (asserts! (> burn-block-height (+ (get grace-period globals) (get next-payment loan))) ERR_LOAN_IN_PROGRESS)
 
     (try! (contract-call? .loan-data set-loan loan-id new-loan))
 
@@ -565,13 +580,16 @@
   (let (
     (loan (try! (get-loan loan-id)))
     (has-collateral (> (get coll-ratio loan) u0))
-    (withdrawn-funds (if has-collateral (try! (withdraw-collateral coll-vault coll-token loan-id recipient)) u0)))
+    (withdrawn-funds (if has-collateral (try! (withdraw-collateral coll-vault coll-token loan-id recipient)) u0))
+    (new-loan (merge loan { status: LIQUIDATED }))
+    (globals (contract-call? .globals get-globals)))
     (try! (caller-is-pool))
     (asserts! (can-liquidate loan-id) ERR_INVALID_STATUS)
     (asserts! (is-eq (contract-of coll-vault) (get coll-vault loan)) ERR_INVALID_CV)
     (asserts! (is-eq (contract-of coll-token) (get coll-token loan)) ERR_INVALID_COLL)
 
-    (ok true)))
+    (try! (contract-call? .loan-data set-loan loan-id new-loan))
+    (ok withdrawn-funds)))
 
 ;; @desc Can loan be liquidated based after next payment and grace-period has passed
 ;; @param loan-id: id of loan being paid for
@@ -598,6 +616,15 @@
 
 (define-read-only (get-rollover-progress-optional (loan-id uint))
   (contract-call? .loan-data get-rollover-progress-optional loan-id))
+
+
+(define-public (impair-loan (loan-id uint))
+  (let (
+    (loan (get-loan-read loan-id))
+    (new-loan (merge loan { status: IMPAIRED })))
+    (try! (caller-is-pool))
+    (try! (contract-call? .loan-data set-loan loan-id new-loan))
+    (ok true)))
 
 ;; @desc borrower requests for a modification to the loan agreement
 ;; @restricted borrower
@@ -648,14 +675,13 @@
     (asserts! (contract-call? .globals is-coll-contract (contract-of coll-type)) ERR_INVALID_COLL)
     (asserts! (is-eq ACTIVE (get status loan)) ERR_INVALID_STATUS)
 
+    (asserts! (is-eq u0 (mod (get maturity-length new-rollover-progress) (get payment-period new-rollover-progress))) ERR_INVALID_TIME)
     ;; If Coll -> Coll
     ;; or Coll -> No Coll
     (if (or (and (> (get coll-ratio new-rollover-progress) u0) (> (get coll-ratio loan) u0))
-      (and (is-eq (get coll-ratio new-rollover-progress) u0) (> (get coll-ratio loan) u0)))
+          (and (is-eq (get coll-ratio new-rollover-progress) u0) (> (get coll-ratio loan) u0)))
       (asserts! (is-eq (get coll-token loan) (get coll-type new-rollover-progress)) ERR_DIFFERENT_COLL)
       false)
-
-    (asserts! (is-eq u0 (mod (get maturity-length new-rollover-progress) (get payment-period new-rollover-progress))) ERR_INVALID_TIME)
 
     (try! (contract-call? .loan-data set-rollover-progress loan-id new-rollover-progress))
     (ok true)))
@@ -696,7 +722,7 @@
   (loan-id uint)
   (coll-type <ft>)
   (cv <cv>)
-  (fv <v>)
+  (fv <fv>)
   (swap-router <swap>)
   (token-id uint)
   (xbtc <ft>)
@@ -731,8 +757,7 @@
         ;; No Coll-ratio -> Coll-ratio
         (let (
           (coll-equivalent (unwrap-panic (contract-call? swap-router get-x-given-y coll-type xbtc (get new-amount rollover))))
-          (coll-amount (/ (* coll-equivalent (get coll-ratio rollover)) BP_PRC))
-        )
+          (coll-amount (/ (* coll-equivalent (get coll-ratio rollover)) BP_PRC)))
           (asserts! (> coll-amount u0) ERR_NOT_ENOUGH_COLLATERAL)
           ;; the collateral contract in the loan does not have to be the same as the new collateral being used
           (try! (send-collateral cv coll-type coll-amount loan-id caller))
@@ -800,7 +825,7 @@
         (new-amount (- (get new-amount rollover) loan-amount))
         (treasury-portion (get-bp new-amount (get treasury-fee globals)))
         (borrow-amount (- new-amount treasury-portion)))
-        (try! (contract-call? fv transfer borrow-amount (get supplier-interface globals) xbtc))
+        (try! (contract-call? fv remove-asset xbtc borrow-amount loan-id (get supplier-interface globals)))
         (try! (contract-call? .loan-data set-rollover-progress loan-id (merge (unwrap-panic (get-rollover-progress loan-id)) { sent-funds: (to-int borrow-amount) })))
         (ok borrow-amount))
       ;; new and previous amount is same or lower so no need to drawdown
@@ -829,7 +854,7 @@
   (loan-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (token-id uint)
   (xbtc <ft>))
   (let (
@@ -842,23 +867,23 @@
     (treasury-portion (get-bp new-amount (get treasury-fee globals)))
     (treasury-addr (get treasury globals))
     (new-terms
-      (merge loan
-        {
-          loan-amount: request-amount,
-          coll-ratio: (get coll-ratio rollover),
-          coll-token: (get coll-type rollover),
-          next-payment: (+ burn-block-height (get payment-period rollover)),
-          apr: (get apr rollover),
-          remaining-payments: (/ (get maturity-length rollover) (get payment-period rollover))
-          })))
+      (merge loan {
+        loan-amount: request-amount,
+        coll-ratio: (get coll-ratio rollover),
+        coll-token: (get coll-type rollover),
+        next-payment: (+ burn-block-height (get payment-period rollover)),
+        apr: (get apr rollover),
+        remaining-payments: (/ (get maturity-length rollover) (get payment-period rollover))
+        })))
     (try! (caller-is-pool))
     (asserts! (is-eq (get status rollover) COMPLETED) ERR_UNAUTHORIZED)
     (asserts! (< (- block-height (get created-at rollover)) (get funding-period globals)) ERR_FUNDING_EXPIRED)
 
-    (try! (contract-call? fv transfer treasury-portion treasury-addr xbtc))
+    (try! (contract-call? fv remove-asset xbtc treasury-portion loan-id treasury-addr))
     
     (try! (contract-call? .loan-data delete-rollover-progress loan-id))
     (try! (contract-call? .loan-data set-loan loan-id new-terms))
+
     (ok true)))
 
 ;; @desc return collateral and funds to the liquidity vault
@@ -878,7 +903,7 @@
   (cv <cv>)
   (fv <fv>)
   (lv-principal principal)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (xbtc <ft>)
   (caller principal))
@@ -927,7 +952,7 @@
 ;; @returns (response uint uint)
 (define-public (make-residual-payment
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (amount uint)
   (xbtc <ft>))
@@ -1011,6 +1036,7 @@
   (/ (* amount bp) BP_PRC))
 
 ;; --- ownable trait
+
 (define-data-var contract-owner principal tx-sender)
 
 (define-read-only (get-contract-owner)
@@ -1044,6 +1070,7 @@
 
 (define-read-only (is-onboarded (caller principal))
   (contract-call? .globals is-onboarded-user-read caller))
+
 
 ;; protocol access
 (define-public (is-supplier-interface)
