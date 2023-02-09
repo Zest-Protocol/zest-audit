@@ -30,7 +30,7 @@
 (define-public (add-pool-governor (governor principal) (token-id uint))
   (begin
     (try! (is-pool-contract))
-    (print { event: "add-pool-governor", payload: { governor: governor, token-id: token-id } })
+    (print { type: "add-pool-governor", payload: { governor: governor, token-id: token-id } })
     (ok (map-set governors { governor: governor, token-id: token-id } true))))
 
 ;; @desc removing pool governor
@@ -41,7 +41,7 @@
 (define-public (remove-pool-governor (governor principal) (token-id uint))
   (begin
     (try! (is-pool-contract))
-    (print { event: "remove-pool-governor", payload: { governor: governor, token-id: token-id } })
+    (print { type: "remove-pool-governor", payload: { governor: governor, token-id: token-id } })
     (ok (map-delete governors { governor: governor, token-id: token-id }))))
 
 ;; -- pool-delegates
@@ -59,7 +59,7 @@
   (begin
     (try! (is-pool-contract))
     (map-set pool-delegate token-id delegate)
-    (print { type: "set-pool-delegate", payloan: { token-id: token-id, delegate: delegate } })
+    (print { type: "set-pool-delegate", payload: { token-id: token-id, delegate: delegate } })
     (ok (map-set delegates delegate token-id))))
 
 ;; -- pool
@@ -72,15 +72,18 @@
     liquidity-vault: principal,
     cp-token: principal,
     rewards-calc: principal,
-    cover-fee: uint,  ;; staking fees in BP
+    withdrawal-manager: principal,
+    cover-fee: uint,  ;; cover pool fees in BP
     delegate-fee: uint, ;; delegate fees in BP
     liquidity-cap: uint,
     principal-out: uint,
     cycle-length: uint,
+    withdrawal-window: uint,
     min-cycles: uint,
     max-maturity-length: uint,
     pool-stx-start: uint,
     pool-btc-start: uint,
+    losses: uint,
     status: (buff 1),
     open: bool }) ;; open to the public
 
@@ -117,22 +120,26 @@
     liquidity-vault: principal,
     cp-token: principal,
     rewards-calc: principal,
+    withdrawal-manager: principal,
     cover-fee: uint,  ;; staking fees in BP
     delegate-fee: uint, ;; delegate fees in BP
     liquidity-cap: uint,
     principal-out: uint,
     cycle-length: uint,
+    withdrawal-window: uint,
     min-cycles: uint,
     max-maturity-length: uint,
     pool-stx-start: uint,
     pool-btc-start: uint,
+    losses: uint,
     status: (buff 1),
-    open: bool })) ;; open to the public
+    open: bool ;; open to the public
+  }))
   (begin
     (try! (is-pool-contract))
     (asserts! (map-insert pool-data token-id data) ERR_POOL_ALREADY_EXISTS)
 
-    (print { type: "create-liquidity-pool", payload: data })
+    (print { type: "create-liquidity-pool", payload: { key: token-id, data: data } })
     (ok true)))
 
 ;; @desc updates pool values
@@ -150,25 +157,31 @@
     liquidity-vault: principal,
     cp-token: principal,
     rewards-calc: principal,
+    withdrawal-manager: principal,
     cover-fee: uint,  ;; staking fees in BP
     delegate-fee: uint, ;; delegate fees in BP
     liquidity-cap: uint,
     principal-out: uint,
     cycle-length: uint,
+    withdrawal-window: uint,
     min-cycles: uint,
     max-maturity-length: uint,
     pool-stx-start: uint,
     pool-btc-start: uint,
+    losses: uint,
     status: (buff 1),
-    open: bool })) ;; open to the public
+    open: bool ;; open to the public
+  })
+  )
   (begin
     (try! (is-pool-contract))
     (map-set pool-data token-id data)
 
-    (print { type: "set-liquidity-pool", payload: data })
+    (print { type: "set-liquidity-pool", payload: { key: token-id, data:  data } })
     (ok true)))
 
-;; loan-id -> token-id
+
+;; -- loan-id -> token-id
 (define-map loans-pool uint uint)
 
 ;; @desc maps loan id to pool id
@@ -179,7 +192,7 @@
 (define-public (set-loan-to-pool (loan-id uint) (pool-id uint))
   (begin
     (try! (is-pool-contract))
-    (print { type: "set-loan-to-pool", payload: { pool-id: pool-id, loan-id: loan-id } })
+    (print { type: "set-loan-to-pool", payload: { loan-id: loan-id, pool-id: pool-id } })
     (ok (map-set loans-pool loan-id pool-id))))
 
 ;; -- liquidity-provider-commitments
@@ -222,7 +235,7 @@
     (try! (is-pool-contract))
     (map-set funds-sent { owner: owner, token-id: token-id } data)
 
-    (print { event: "set-funds-sent", payload: data })
+    (print { type: "set-funds-sent", payload: { key: { owner: owner, token-id: token-id }, data:  data } })
     (ok true)))
 
 ;; -- last-pool-id
@@ -235,7 +248,7 @@
 (define-public (set-last-pool-id (id uint))
   (begin
     (try! (is-pool-contract))
-    (print { event: "set-last-pool-id", payload: { last-pool-id: id } })
+    (print { type: "set-last-pool-id", payload: { last-pool-id: id } })
     (ok (var-set last-pool-id id))))
 
 ;; -- onboarding liquidity-provider
@@ -250,7 +263,7 @@
 (define-public (add-liquidity-provider (token-id uint) (liquidity-provider principal))
   (begin
     (try! (is-pool-contract))
-    (print { event: "add-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
+    (print { type: "add-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
 		(ok (map-set liquidity-providers { token-id: token-id, lp: liquidity-provider } true))))
 
 ;; @desc remove liquidity pool provider to the set of allowed providers in case that the pool is closed
@@ -261,13 +274,14 @@
 (define-public (remove-liquidity-provider (token-id uint) (liquidity-provider principal))
   (begin
     (try! (is-pool-contract))
-    (print { event: "remove-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
+    (print { type: "remove-liquidity-provider", payload: { liquidity-provider: liquidity-provider, token-id: token-id } })
 		(ok (map-set liquidity-providers { token-id: token-id, lp: liquidity-provider } false))))
 
 (define-read-only (is-liquidity-provider (token-id uint) (liquidity-provider principal))
   (default-to false (map-get? liquidity-providers { token-id: token-id, lp: liquidity-provider })))
 
 ;; -- pool getters
+
 (define-public (get-pool (token-id uint))
   (ok (unwrap! (map-get? pool-data token-id) ERR_INVALID_TOKEN_ID)))
 

@@ -5,6 +5,7 @@
 (use-trait lv .liquidity-vault-trait.liquidity-vault-trait)
 (use-trait cv .coll-vault-trait.coll-vault-trait)
 (use-trait ft .ft-trait.ft-trait)
+(use-trait sip-010 .sip-010-trait.sip-010-trait)
 (use-trait v .vault-trait.vault-trait)
 (use-trait fv .funding-vault-trait.funding-vault-trait)
 (use-trait rewards-calc .rewards-calc-trait.rewards-calc-trait)
@@ -35,20 +36,22 @@
 ;; @param min-to-receive: minimum receivable calculated off-chain to avoid the supplier front-run the swap by adjusting fees
 ;; @returns (response boolean uint)
 (define-public (send-funds
-  (block { header: (buff 80), height: uint })
-  (prev-blocks (list 10 (buff 80)))
-  (tx (buff 1024))
-  (proof { tx-index: uint, hashes: (list 12 (buff 32)), tree-depth: uint })
-  (output-index uint)
-  (sender (buff 33))
-  (recipient (buff 33))
-  (expiration-buff (buff 4))
-  (hash (buff 32))
-  (swapper-buff (buff 4))
-  (supplier-id uint)
-  (min-to-receive uint))
+    (block { header: (buff 80), height: uint })
+    (prev-blocks (list 10 (buff 80)))
+    (tx (buff 1024))
+    (proof { tx-index: uint, hashes: (list 12 (buff 32)), tree-depth: uint })
+    (output-index uint)
+    (sender (buff 33))
+    (recipient (buff 33))
+    (expiration-buff (buff 4))
+    (hash (buff 32))
+    (swapper-buff (buff 4))
+    (supplier-id uint)
+    (min-to-receive uint)
+  )
   (let (
-    (tx-id (contract-call? .clarity-bitcoin get-txid tx)))
+    (tx-id (contract-call? .clarity-bitcoin get-txid tx))
+  )
     (asserts! (map-insert escrowed-tx tx-id (get height block)) ERR_TX_ESCROWED)
     (print tx-id)
     (try! (contract-call? .magic-protocol escrow-swap block prev-blocks tx proof output-index sender recipient expiration-buff hash swapper-buff supplier-id min-to-receive))
@@ -65,19 +68,19 @@
 ;; @param rewards-calc: contract used to calculate zest rewards
 ;; @returns (response uint uint)
 (define-public (send-funds-xbtc
-  (factor uint)
-  (lp-token <lp-token>)
-  (token-id uint)
-  (zp-token <dtc>)
-  (lv <lv>)
-  (xbtc-ft <ft>)
-  (amount uint)
-  (rewards-calc <rewards-calc>))
+    (factor uint)
+    (lp-token <sip-010>)
+    (token-id uint)
+    (zp-token <dtc>)
+    (lv <lv>)
+    (xbtc-ft <ft>)
+    (amount uint)
+    (rewards-calc <rewards-calc>))
   (let (
     (height burn-block-height)
     (globals (contract-call? .globals get-globals)))
     (asserts! (get contingency-plan globals) ERR_CONTINGENCY_PLAN_DISABLED)
-    (try! (contract-call? .pool-v1-0 send-funds lp-token token-id zp-token amount factor height lv xbtc-ft rewards-calc tx-sender))
+    (try! (contract-call? .pool-v1-0 send-funds lp-token token-id lv xbtc-ft amount tx-sender))
     (ok amount)))
 
 ;; @desc Complete the escrow in magic-protocol to commit funds to the liquidity pool
@@ -95,7 +98,7 @@
   (txid (buff 32))
   (preimage (buff 128))
   (factor uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (zp-token <dtc>)
   (lv <lv>)
@@ -108,25 +111,14 @@
     (hash (get hash swap))
     (height (unwrap! (map-get? escrowed-tx txid) ERR_TX_DOES_NOT_EXIST))
     (swapper (get swapper-principal swap)))
-    (try! (contract-call? .pool-v1-0 send-funds lp-token token-id zp-token (get sats swap) factor height lv xbtc-ft rewards-calc tx-sender))
+    (try! (contract-call? .pool-v1-0 send-funds lp-token token-id lv xbtc-ft (get sats swap) tx-sender))
     (map-delete escrowed-tx txid)
     (ok (get sats swap))))
 
-;; @desc In case of leaked preimage, user can still complete the send-funds process without
-;; having to enable the contingency plan
-;; @param txid: the txid of the BTC tx used for this inbound swap
-;; @param factor: number of cycles to be committed
-;; @param lp-token: token to hold xbtc rewards for LPers
-;; @param token-id: id of the pool that funds are being sent to
-;; @param zp-token: token to hold zest rewards funds for LPers
-;; @param lv: liquidity vault contract holding the liquid funds in the pool
-;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
-;; @param rewards-calc: contract used to calculate zest rewards
-;; @returns (response uint uint)
 (define-public (send-funds-finalize-completed
   (txid (buff 32))
   (factor uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (zp-token <dtc>)
   (lv <lv>)
@@ -139,16 +131,11 @@
     (hash (get hash swap))
     (height (unwrap! (map-get? escrowed-tx txid) ERR_TX_DOES_NOT_EXIST))
     (swapper (get swapper-principal swap)))
-    (try! (contract-call? .pool-v1-0 send-funds lp-token token-id zp-token (get sats swap) factor height lv xbtc-ft rewards-calc tx-sender))
+    (try! (contract-call? .pool-v1-0 send-funds lp-token token-id lv xbtc-ft (get sats swap) tx-sender))
     (map-delete escrowed-tx txid)
     (ok (get sats swap))))
 
 ;; @desc Escrows funds using the magic-protocol and completes in the same transaction
-;; @param block: a tuple containing `header` (the Bitcoin block header) and the `height` (Stacks height)
-;; where the BTC tx was confirmed.
-;; @param prev-blocks: because Clarity contracts can't get Bitcoin headers when there is no Stacks block,
-;; this param allows users to specify the chain of block headers going back to the block where the
-;; BTC tx was confirmed.
 ;; @param tx; the hex data of the BTC tx
 ;; @param proof; a merkle proof to validate inclusion of this tx in the BTC block
 ;; @param output-index; the index of the HTLC output in the BTC tx
@@ -159,6 +146,7 @@
 ;; @param swapper-buff; a 4-byte integer that indicates the `swapper-id`
 ;; @param supplier-id; the supplier used in this swap
 ;; @param min-to-receive; minimum receivable calculated off-chain to avoid the supplier front-run the swap by adjusting fees
+;; @param txid: the txid of the BTC tx used for this inbound swap
 ;; @param preimage: the preimage that hashes to the swap's `hash`
 ;; @param factor: number of cycles to be committed
 ;; @param lp-token: token to hold xbtc rewards for LPers
@@ -184,7 +172,7 @@
   ;; second part
   (preimage (buff 128))
   (factor uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (zp-token <dtc>)
   (lv <lv>)
@@ -198,29 +186,15 @@
       (fee (get fee swap))
       (xbtc (get xbtc swap))
       (swapper (get swapper-principal swap)))
-      (try! (contract-call? .pool-v1-0 send-funds lp-token token-id zp-token (get sats swap) factor (get height block) lv xbtc-ft rewards-calc tx-sender))
+      (try! (contract-call? .pool-v1-0 send-funds lp-token token-id lv xbtc-ft (get sats swap) tx-sender))
       (ok (get sats swap)))))
 
-;; @desc complete a payment test
-;; @param txid: the txid of the BTC tx used for this inbound swap
-;; @param preimage: the preimage that hashes to the swap's `hash`
-;; @param loan-id: id of the loan to which the payment is made
-;; @param payment: contract for completing payments
-;; @param lp-token: token to hold xbtc rewards for LPers
-;; @param lv: liquidity vault contract holding the liquid funds in the pool
-;; @param token-id: id of the pool that funds are being sent to
-;; @param cp-token: contract of the token accounting for cover pool zest rewards
-;; @param cp-rewards-token: contract of the token accounting for cover pool xBTC rewards
-;; @param zp-token: contract of the token accounting for lp zest rewards
-;; @param swap-router: logic for swapping assets
-;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
-;; @returns (response uint uint)
 (define-public (make-payment-verify
   (txid (buff 32))
   (preimage (buff 128))
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -238,25 +212,12 @@
     (map-delete escrowed-tx txid)
     (ok (try! (contract-call? .loan-v1-0 make-payment-verify loan-id height payment lp-token lv token-id cp-token cp-rewards-token zp-token swap-router (get sats swap) xbtc-ft tx-sender)))))
 
-;; @desc In case of leaked preimage, user can still complete the make-payment-verify process without
-;; having to enable the contingency plan
-;; @param txid: the txid of the BTC tx used for this inbound swap
-;; @param loan-id: id of the loan to which the payment is made
-;; @param payment: contract for completing payments
-;; @param lp-token: token to hold xbtc rewards for LPers
-;; @param lv: liquidity vault contract holding the liquid funds in the pool
-;; @param token-id: id of the pool that funds are being sent to
-;; @param cp-token: contract of the token accounting for cover pool zest rewards
-;; @param cp-rewards-token: contract of the token accounting for cover pool xBTC rewards
-;; @param zp-token: contract of the token accounting for lp zest rewards
-;; @param swap-router: logic for swapping assets
-;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
-;; @returns (response uint uint)
+
 (define-public (make-payment-verify-completed
   (txid (buff 32))
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -293,7 +254,7 @@
   (preimage (buff 128))
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -311,25 +272,11 @@
     (map-delete escrowed-tx txid)
     (ok (try! (contract-call? .loan-v1-0 make-payment loan-id height payment lp-token lv token-id cp-token cp-rewards-token zp-token swap-router (get sats swap) xbtc-ft tx-sender)))))
 
-;; @desc In case of leaked preimage, user can still complete the make-payment process without
-;; having to enable the contingency plan
-;; @param txid: the txid of the BTC tx used for this inbound swap
-;; @param loan-id: id of the loan to which the payment is made
-;; @param payment: contract for completing payments
-;; @param lp-token: token to hold xbtc rewards for LPers
-;; @param lv: liquidity vault contract holding the liquid funds in the pool
-;; @param token-id: id of the pool that funds are being sent to
-;; @param cp-token: contract of the token accounting for cover pool zest rewards
-;; @param cp-rewards-token: contract of the token accounting for cover pool xBTC rewards
-;; @param zp-token: contract of the token accounting for lp zest rewards
-;; @param swap-router: logic for swapping assets
-;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
-;; @returns (response uint uint)
 (define-public (make-payment-completed
   (txid (buff 32))
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -352,6 +299,7 @@
 ;; @param preimage: the preimage that hashes to the swap's `hash`
 ;; @param loan-id: id of the loan to which the payment is made
 ;; @param lp-token: token to hold xbtc rewards for LPers
+;; @param lv: liquidity vault contract holding the liquid funds in the pool
 ;; @param token-id: id of the pool that funds are being sent to
 ;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
 ;; @returns (response uint uint)
@@ -359,7 +307,7 @@
   (txid (buff 32))
   (preimage (buff 128))
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (xbtc-ft <ft>))
@@ -373,19 +321,10 @@
     (map-delete escrowed-tx txid)
     (ok (try! (contract-call? .pool-v1-0 make-residual-payment loan-id lp-token token-id lv (get sats swap) xbtc-ft tx-sender)))))
 
-;; @desc In case of leaked preimage, user can still complete the make-residual-payment process without
-;; having to enable the contingency plan
-;; @param txid: the txid of the BTC tx used for this inbound swap
-;; @param loan-id: id of the loan to which the payment is made
-;; @param lp-token: token to hold xbtc rewards for LPers
-;; @param lv: liquidity vault contract holding the liquid funds in the pool
-;; @param token-id: id of the pool that funds are being sent to
-;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
-;; @returns (response uint uint)
 (define-public (make-residual-payment-completed
   (txid (buff 32))
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (xbtc-ft <ft>))
@@ -418,7 +357,7 @@
   (preimage (buff 128))
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -436,25 +375,11 @@
     (map-delete escrowed-tx txid)
     (ok (try! (contract-call? .loan-v1-0 make-full-payment loan-id height payment lp-token lv token-id cp-token cp-rewards-token zp-token swap-router (get sats swap) xbtc-ft tx-sender)))))
 
-;; @desc In case of leaked preimage, user can still complete the make-full-payment process without
-;; having to enable the contingency plan
-;; @param txid: the txid of the BTC tx used for this inbound swap
-;; @param loan-id: id of the loan to which the payment is made
-;; @param payment: contract for completing payments
-;; @param lp-token: token to hold xbtc rewards for LPers
-;; @param lv: liquidity vault contract holding the liquid funds in the pool
-;; @param token-id: id of the pool that funds are being sent to
-;; @param cp-token: contract of the token accounting for cover pool zest rewards
-;; @param cp-rewards-token: contract of the token accounting for cover pool xBTC rewards
-;; @param zp-token: contract of the token accounting for lp zest rewards
-;; @param swap-router: logic for swapping assets
-;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
-;; @returns (response uint uint)
 (define-public (make-full-payment-completed
   (txid (buff 32))
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
@@ -489,17 +414,19 @@
   (amount uint)
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
   (cp-rewards-token <dt>)
   (zp-token <dt>)
   (swap-router <swap>)
-  (xbtc-ft <ft>))
+  (xbtc-ft <ft>)
+  )
   (let (
     (height burn-block-height)
-    (globals (contract-call? .globals get-globals)))
+    (globals (contract-call? .globals get-globals))
+  )
     (asserts! (get contingency-plan globals) ERR_CONTINGENCY_PLAN_DISABLED)
     (contract-call? .loan-v1-0 make-payment loan-id height payment lp-token lv token-id cp-token cp-rewards-token zp-token swap-router amount xbtc-ft tx-sender)))
 
@@ -520,16 +447,18 @@
   (amount uint)
   (loan-id uint)
   (payment <payment>)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (lv <lv>)
   (token-id uint)
   (cp-token <cp-token>)
   (cp-rewards-token <dt>)
   (zp-token <dt>)
   (swap-router <swap>)
-  (xbtc-ft <ft>))
+  (xbtc-ft <ft>)
+  )
   (let (
-    (globals (contract-call? .globals get-globals)))
+    (globals (contract-call? .globals get-globals))
+  )
     (asserts! (get contingency-plan globals) ERR_CONTINGENCY_PLAN_DISABLED)
     (ok (try! (contract-call? .loan-v1-0 make-full-payment loan-id burn-block-height payment lp-token lv token-id cp-token cp-rewards-token zp-token swap-router amount xbtc-ft tx-sender)))))
 
@@ -549,17 +478,18 @@
   (btc-version (buff 1))
   (btc-hash (buff 20))
   (supplier-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (zp-token <dtc>)
   (token-id uint)
   (lv <lv>)
-  (xbtc-ft <ft>))
+  (xbtc-ft <ft>)
+  )
   (let (
     (pool (try! (contract-call? .pool-v1-0 get-pool token-id))))
     (if (get open pool)
       true
       (asserts! (contract-call? .globals is-onboarded-address-read tx-sender btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED))
-    (try! (contract-call? .pool-v1-0 withdraw lp-token zp-token token-id lv xbtc xbtc-ft tx-sender))
+    (try! (contract-call? .pool-v1-0 redeem lp-token token-id lv xbtc-ft xbtc tx-sender tx-sender))
     (try! (contract-call? .magic-protocol initiate-outbound-swap xbtc btc-version btc-hash supplier-id))
     (print { btc-version: btc-version, btc-hash: btc-hash, supplier-id: supplier-id, amount: xbtc })
     (ok true)))
@@ -574,15 +504,17 @@
 ;; @returns (response true uint)
 (define-public (withdraw-xbtc
   (xbtc uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (zp-token <dtc>)
   (token-id uint)
   (lv <lv>)
-  (xbtc-ft <ft>))
+  (xbtc-ft <ft>)
+  )
   (let (
-    (globals (contract-call? .globals get-globals)))
+    (globals (contract-call? .globals get-globals))
+  )
     (asserts! (get contingency-plan globals) ERR_CONTINGENCY_PLAN_DISABLED)
-    (try! (contract-call? .pool-v1-0 withdraw lp-token zp-token token-id lv xbtc xbtc-ft tx-sender))
+    (try! (contract-call? .pool-v1-0 redeem lp-token token-id lv xbtc-ft xbtc tx-sender tx-sender))
     (ok true)))
 
 ;; @desc Initiate withdrawal process through magic protocol to withdraw rewards in liquidity-pool
@@ -594,23 +526,23 @@
 ;; @param lv: liquidity vault contract holding the liquid funds in the pool
 ;; @param xbtc: SIP-010 token to account for bitcoin sent to pools
 ;; @returns (response uint uint)
-(define-public (withdraw-rewards
-  (btc-version (buff 1))
-  (btc-hash (buff 20))
-  (supplier-id uint)
-  (lp-token <lp-token>)
-  (token-id uint)
-  (lv <lv>)
-  (xbtc <ft>))
-  (let (
-    (withdrawn-funds (try! (contract-call? .pool-v1-0 withdraw-rewards lp-token token-id lv xbtc tx-sender)))
-    (pool (try! (contract-call? .pool-v1-0 get-pool token-id))))
-    (if (get open pool)
-      true
-      (asserts! (contract-call? .globals is-onboarded-address-read tx-sender btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED))
-    (print { btc-version: btc-version, btc-hash: btc-hash, supplier-id: supplier-id, amount: withdrawn-funds })
-    (try! (contract-call? .magic-protocol initiate-outbound-swap withdrawn-funds btc-version btc-hash supplier-id))
-    (ok withdrawn-funds)))
+;; (define-public (withdraw-rewards
+;;   (btc-version (buff 1))
+;;   (btc-hash (buff 20))
+;;   (supplier-id uint)
+;;   (lp-token <lp-token>)
+;;   (token-id uint)
+;;   (lv <lv>)
+;;   (xbtc <ft>))
+;;   (let (
+;;     (withdrawn-funds (try! (contract-call? .pool-v1-0 withdraw-rewards lp-token token-id lv xbtc tx-sender)))
+;;     (pool (try! (contract-call? .pool-v1-0 get-pool token-id))))
+;;     (if (get open pool)
+;;       true
+;;       (asserts! (contract-call? .globals is-onboarded-address-read tx-sender btc-version btc-hash) ERR_ADDRESS_NOT_ALLOWED))
+;;     (print { btc-version: btc-version, btc-hash: btc-hash, supplier-id: supplier-id, amount: withdrawn-funds })
+;;     (try! (contract-call? .magic-protocol initiate-outbound-swap withdrawn-funds btc-version btc-hash supplier-id))
+;;     (ok withdrawn-funds)))
 
 ;; @desc Initiate withdrawal process through magic protocol to withdraw rewards in cover-pool
 ;; @param btc-version: the address version for the swapper's BTC address
@@ -667,33 +599,20 @@
 ;; @param lv: liquidity vault contract holding the liquid funds in the pool
 ;; @param xbtc: SIP-010 token to account for bitcoin sent to pools
 ;; @returns (response uint uint)
-(define-public (withdraw-rewards-xbtc
-  (lp-token <lp-token>)
-  (token-id uint)
-  (lv <lv>)
-  (xbtc <ft>))
-  (let (
-    (globals (contract-call? .globals get-globals))
-    (withdrawn-funds (try! (contract-call? .pool-v1-0 withdraw-rewards lp-token token-id lv xbtc tx-sender))))
-    (asserts! (get contingency-plan globals) ERR_CONTINGENCY_PLAN_DISABLED)
-    (ok withdrawn-funds)))
+;; (define-public (withdraw-rewards-xbtc
+;;   (lp-token <lp-token>)
+;;   (token-id uint)
+;;   (lv <lv>)
+;;   (xbtc <ft>))
+;;   (let (
+;;     (globals (contract-call? .globals get-globals))
+;;     (withdrawn-funds (try! (contract-call? .pool-v1-0 withdraw-rewards lp-token token-id lv xbtc tx-sender))))
+;;     (asserts! (get contingency-plan globals) ERR_CONTINGENCY_PLAN_DISABLED)
+;;     (ok withdrawn-funds)))
 
-;; @desc Initiate drawdown process through magic protocol to withdraw a small part of a  funded loan
-;; @param loan-id: id of the loan to which the payment is made
-;; @param lp-token: token to hold xbtc rewards for LPers
-;; @param token-id: id of the pool that funds are being sent to
-;; @param coll-token: SIP-010 contract for collateral
-;; @param coll-vault: contract that holds the collateral SIP-010
-;; @param fv: contract that holds funds before drawdown
-;; @param btc-version: the address version for the swapper's BTC address
-;; @param btc-hash: the hash for the swapper's BTC address
-;; @param supplier-id: the supplier used for this swap
-;; @param swap-router: logic for swapping assets
-;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
-;; @returns (response { swap-id: uint, sats: uint } uint)
 (define-public (drawdown-verify
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
@@ -728,16 +647,17 @@
 ;; @returns (response { swap-id: uint, sats: uint } uint)
 (define-public (drawdown
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (btc-version (buff 1))
   (btc-hash (buff 20))
   (supplier-id uint)
   (swap-router <swap>)
-  (xbtc-ft <ft>))
+  (xbtc-ft <ft>)
+  )
   (let (
     (pool (try! (contract-call? .pool-v1-0 get-pool token-id)))
     (xbtc (try! (contract-call? .pool-v1-0 drawdown loan-id lp-token token-id coll-token coll-vault fv swap-router xbtc-ft tx-sender)))
@@ -757,8 +677,8 @@
 ;; @param fv: contract that holds funds before drawdown
 ;; @param xbtc-ft: SIP-010 token to account for bitcoin sent to pools
 ;; @param block: a tuple containing `header` (the Bitcoin block header) and the `height` (Stacks height)
-;; where the BTC tx was confirmed.
 ;; @param prev-blocks: because Clarity contracts can't get Bitcoin headers when there is no Stacks block,
+;; where the BTC tx was confirmed.
 ;; this param allows users to specify the chain of block headers going back to the block where the
 ;; BTC tx was confirmed.
 ;; @param tx: the hex data of the BTC tx
@@ -768,11 +688,11 @@
 ;; @returns (response uint uint)
 (define-public (finalize-drawdown
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (xbtc-ft <ft>)
   (block { header: (buff 80), height: uint })
   (prev-blocks (list 10 (buff 80)))
@@ -796,11 +716,11 @@
 ;; @returns (response { recipient: uint, sats: uint } uint)
 (define-public (drawdown-xbtc
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (swap-router <swap>)
   (xbtc-ft <ft>))
   (let (
@@ -826,11 +746,11 @@
 ;; @returns (response uint uint)
 (define-public (complete-rollover
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (btc-version (buff 1))
   (btc-hash (buff 20))
   (supplier-id uint)
@@ -865,11 +785,11 @@
 ;; @returns (response uint uint)
 (define-public (finalize-rollover
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
-  (fv <v>)
+  (fv <fv>)
   (xbtc-ft <ft>)
   (block { header: (buff 80), height: uint })
   (prev-blocks (list 10 (buff 80)))
@@ -893,16 +813,18 @@
 ;; @returns (response uint uint)
 (define-public (cancel-drawdown
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
   (fv <fv>)
   (xbtc-ft <ft>)
-  (swap-id uint))
+  (swap-id uint)
+  )
   (let (
     (swap (try! (contract-call? .magic-protocol revoke-expired-outbound swap-id)))
-    (recovered-amount (get xbtc swap)))
+    (recovered-amount (get xbtc swap))
+  )
     (try! (as-contract (contract-call? xbtc-ft transfer recovered-amount tx-sender .pool-v1-0 none)))
     (try! (contract-call? .pool-v1-0 cancel-drawdown loan-id lp-token token-id coll-token coll-vault fv recovered-amount xbtc-ft))
     (ok (get xbtc swap))))
@@ -919,7 +841,7 @@
 ;; @returns (response uint uint)
 (define-public (cancel-rollover
   (loan-id uint)
-  (lp-token <lp-token>)
+  (lp-token <sip-010>)
   (token-id uint)
   (coll-token <ft>)
   (coll-vault <cv>)
@@ -992,13 +914,13 @@
 
 ;; owner methods
 (define-public (register-supplier
-  (public-key (buff 33))
-  (inbound-fee (optional int))
-  (outbound-fee (optional int))
-  (outbound-base-fee int)
-  (inbound-base-fee int)
-  (name (string-ascii 18))
-  (funds uint))
+    (public-key (buff 33))
+    (inbound-fee (optional int))
+    (outbound-fee (optional int))
+    (outbound-base-fee int)
+    (inbound-base-fee int)
+    (name (string-ascii 18))
+    (funds uint))
   (begin
     (try! (validate-owner))
     (as-contract (contract-call? .magic-protocol register-supplier public-key inbound-fee outbound-fee outbound-base-fee inbound-base-fee funds))))
@@ -1044,20 +966,25 @@
 (define-data-var highest-set-liquidity uint burn-block-height)
 
 (define-read-only (get-current-liquidity)
-  (get-liquidity (var-get highest-set-liquidity)))
+  (get-liquidity (var-get highest-set-liquidity))
+)
 
 (define-read-only (get-liquidity-read (height uint))
-  (unwrap-panic (map-get? protocol-liquidity height)))
+  (unwrap-panic (map-get? protocol-liquidity height))
+)
 
 (define-read-only (get-liquidity (height uint))
-  (ok (unwrap! (map-get? protocol-liquidity height) ERR_HEIGHT_UNAVAILABLE)))
+  (ok (unwrap! (map-get? protocol-liquidity height) ERR_HEIGHT_UNAVAILABLE))
+)
 
 (define-public (update-liquidity (height uint) (liquidity uint))
   (begin
     (asserts! (contract-call? .globals is-governor tx-sender) ERR_UNAUTHORIZED)
     (if (> height (var-get highest-set-liquidity)) (var-set highest-set-liquidity height) false)
-    (print { event: "updated_liquidity", height: height, liquidity: liquidity })
-    (ok (map-set protocol-liquidity height liquidity))))
+    (print { type: "updated_liquidity", payload: { height: height, liquidity: liquidity } })
+    (ok (map-set protocol-liquidity height liquidity))
+  )
+)
 
 ;; ERROR START 1000
 (define-constant ERR_UNAUTHORIZED (err u1000))
